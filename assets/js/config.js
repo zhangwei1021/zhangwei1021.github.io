@@ -11,8 +11,8 @@
 
 window.APP_CONFIG = {
   // ↓↓↓ Supabase 项目设置 → API 里复制（详见 README.md）↓↓↓
-  supabaseUrl: '',
-  supabaseAnonKey: '',
+  supabaseUrl: 'https://hyshywpvzskathajihqo.supabase.co',
+  supabaseAnonKey: 'sb_publishable_B8vjYL2lg_12Vutxz0h8QA_fzauMD4k',
   // ↑↑↑ 例：'https://abcdefghijk.supabase.co' 和 'eyJhbGciOi...' ↑↑↑
 
   // 公开读取的 Storage bucket（schema.sql 会自动创建）
