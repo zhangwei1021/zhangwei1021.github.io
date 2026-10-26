@@ -1,7 +1,7 @@
 /* =========================================================================
  *  站点配置 —— 你只需要改这个文件
  * =========================================================================
- *  1) 云端模式：把 Supabase 的 Project URL 和 anon public key 填到下面。
+ *  1) 云端模式：把 Supabase 的 Project URL 和 anon public key（新界面叫 publishable key）填到下面。
  *     两处都填好之后，网站会自动从「本地模式」切换到「云端模式」，
  *     实现两个人登录、照片云端存储、设置同步。
  *
@@ -10,10 +10,11 @@
  * ========================================================================= */
 
 window.APP_CONFIG = {
-  // ↓↓↓ Supabase 项目设置 → API 里复制（详见 README.md）↓↓↓
+  // ↓↓↓ 从 Supabase 项目页右上角「Connect」弹窗复制（详见 README.md 第三节）↓↓↓
   supabaseUrl: 'https://hyshywpvzskathajihqo.supabase.co',
   supabaseAnonKey: 'sb_publishable_B8vjYL2lg_12Vutxz0h8QA_fzauMD4k',
-  // ↑↑↑ 例：'https://abcdefghijk.supabase.co' 和 'eyJhbGciOi...' ↑↑↑
+  // ↑↑↑ 例：'https://abcdefghijk.supabase.co' 和 'sb_publishable_...'
+  //     老界面的 anon public 是 'eyJhbGciOi...' 开头，两种我都认 ↑↑↑
 
   // 公开读取的 Storage bucket（schema.sql 会自动创建）
   photoBucket: 'photos',

@@ -212,7 +212,154 @@ window.Views.settings = (function () {
             <button class="btn btn--ghost" type="button" data-pass>修改我的密码</button></div>
         </div>
       </div>
+
+      ${aiSection(ctx)}
     </section>`;
+  }
+
+  /* ---------------------------------------------------- AI 分身设置区 */
+  function memRow(m) {
+    return `<div class="mem">
+      <div class="mem__main">
+        <div class="mem__title">${esc(m.title || m.kind || '记忆')}${m.happened_on ? `<span class="mem__date">${esc(m.happened_on)}</span>` : ''}</div>
+        ${m.content ? `<div class="mem__text">${esc(m.content)}</div>` : ''}
+      </div>
+      <div class="mem__tools">
+        <button class="btn btn--ghost btn--sm" type="button" data-mem-edit="${esc(m.id)}">改</button>
+        <button class="btn btn--ghost btn--sm" type="button" data-mem-del="${esc(m.id)}">删</button>
+      </div>
+    </div>`;
+  }
+
+  function aiSection(ctx) {
+    const cloud = window.DB.isCloud();
+    const c = Object.assign({}, window.DB.ai.defaults, ctx.aiConfig || {});
+    const A = (ctx.settings && ctx.settings.nicknameA) || '我';
+    const B = (ctx.settings && ctx.settings.nicknameB) || 'TA';
+    const provs = (window.DB.ai && window.DB.ai.providers) || [{ id: 'deepseek', name: 'DeepSeek 官方', console: 'platform.deepseek.com', models: ['deepseek-flash'] }];
+    const curProv = provs.filter((p) => p.id === c.provider)[0] || provs[0];
+    const mems = (ctx.aiMemories || []).slice()
+      .sort((a, b) => String(b.created_at || '').localeCompare(String(a.created_at || '')));
+    const kinds = ['第一次', '称呼', '习惯', '纪念日', '家人朋友', '其他'];
+
+    return `
+      <div class="card card--pad set-sec" style="margin-top:22px">
+        <h3 class="set-sec__title">💬 AI 分身</h3>
+        <p class="field__hint" style="margin:-4px 0 12px">
+          做一个「AI 版的 ${esc(A)}」，让 ${esc(B)} 打开 <b>AI 分身</b> 那一页就能跟他说说话。
+          人设写得越像你，它就越像你；把你们的小事加进下面的「记忆」，它就照着这些回答，不会乱编。
+        </p>
+        ${cloud ? '' : `<div class="banner banner--info" style="margin-bottom:14px"><span>🛠️</span>
+          <div>现在是<b>本地模式</b>：人设和记忆可以在这里先写好，但要真的能聊天，得先照
+          <b>README 第八节</b>接上 Supabase（跑 ai.sql、配好模型钥匙、部署 ai-chat 函数）。</div></div>`}
+
+        <form id="ai-form" autocomplete="off">
+          <div class="set-grid">
+            <label class="field"><span class="field__label">这个分身代表谁</span>
+              <select class="input" name="aiOwner">
+                <option value="A" ${c.owner === 'A' ? 'selected' : ''}>${esc(A)}（昵称 A）</option>
+                <option value="B" ${c.owner === 'B' ? 'selected' : ''}>${esc(B)}（昵称 B）</option>
+              </select></label>
+            <label class="field"><span class="field__label">用哪家的模型</span>
+              <select class="input" name="aiProvider" data-ai-provider>
+                ${provs.map((p) => `<option value="${esc(p.id)}" ${p.id === curProv.id ? 'selected' : ''}>${esc(p.name)}</option>`).join('')}
+              </select>
+              <span class="field__hint" data-ai-console>钥匙在 ${esc(curProv.console)} 创建，存进 Supabase 的 Secrets（README 第八节）</span></label>
+            <label class="field"><span class="field__label">用哪个模型</span>
+              <input class="input" name="aiModel" list="ai-model-list" value="${esc(c.model || curProv.models[0])}" placeholder="${esc(curProv.models[0])}">
+              <datalist id="ai-model-list">${curProv.models.map((m) => `<option value="${esc(m)}"></option>`).join('')}</datalist>
+              <span class="field__hint">下拉里是常用的几个，也可以自己手写模型名</span></label>
+            <label class="field"><span class="field__label">每天最多聊几句（保护你的余额）</span>
+              <input class="input" type="number" min="0" max="500" name="aiLimit" value="${Number(c.daily_limit) || 60}"></label>
+          </div>
+
+          <label class="field"><span class="field__label">人设：我是谁、我怎么说话</span>
+            <textarea class="input" name="aiPersona" rows="6" placeholder="我是她的男朋友，说话像平时发微信那样，轻松、口语化，偶尔开个玩笑。她累的时候先心疼她，不要讲大道理。">${esc(c.persona || '')}</textarea></label>
+
+          <label class="field"><span class="field__label">说话习惯：口头禅、怎么称呼她、不要说的话</span>
+            <textarea class="input" name="aiStyle" rows="4" placeholder="口头禅：乖乖、好家伙&#10;怎么称呼她：宝贝、张张包&#10;不要说的话：别用「亲爱的用户」「作为 AI」这种腔调">${esc(c.style_notes || '')}</textarea></label>
+
+          <div style="display:flex;gap:16px;flex-wrap:wrap;margin:4px 0 12px">
+            <label class="check"><input type="checkbox" name="aiEnabled" ${c.enabled !== false ? 'checked' : ''}> 开启 AI 分身</label>
+            <label class="check"><input type="checkbox" name="aiMorning" ${c.greet_morning !== false ? 'checked' : ''}> 早上主动道早安</label>
+            <label class="check"><input type="checkbox" name="aiNight" ${c.greet_night !== false ? 'checked' : ''}> 晚上主动道晚安</label>
+          </div>
+
+          <div style="display:flex;gap:12px;flex-wrap:wrap;align-items:center">
+            <button class="btn btn--primary" type="submit">💾 保存分身设置</button>
+            <button class="btn btn--ghost" type="button" data-ai-test>🔌 测试连接</button>
+            <a class="btn btn--ghost" href="#/ai">去聊天看看 →</a>
+            <span class="field__hint" id="ai-hint"></span>
+          </div>
+        </form>
+
+        <div style="margin-top:22px;border-top:1px dashed var(--line);padding-top:16px">
+          <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:10px">
+            <b style="font-size:15px">🧠 记忆清单</b>
+            <span class="field__hint">${mems.length} 条 · 分身只照着这些说，不会自己编</span>
+            <button class="btn btn--ghost btn--sm" type="button" data-mem-new style="margin-left:auto">＋ 添加记忆</button>
+          </div>
+          ${mems.length
+            ? `<div class="mem-list">${mems.map(memRow).join('')}</div>`
+            : `<div class="field__hint">还没有记忆。建议先加几条，比如「她不吃香菜」「我们第一次见面在图书馆」「她生气的时候要先哄」。</div>`}
+        </div>
+      </div>`;
+  }
+
+  function readAi(form) {
+    const c = form.elements;
+    const prov = c.aiProvider ? c.aiProvider.value : 'deepseek';
+    const def = ((window.DB.ai && window.DB.ai.providers) || []).filter((p) => p.id === prov)[0];
+    const model = c.aiModel ? String(c.aiModel.value || '').trim() : '';
+    return {
+      owner: c.aiOwner ? c.aiOwner.value : 'A',
+      provider: prov,
+      model: model || (def ? def.models[0] : 'deepseek-flash'),
+      daily_limit: Number(c.aiLimit ? c.aiLimit.value : 60) || 60,
+      persona: c.aiPersona ? String(c.aiPersona.value || '').trim() : '',
+      style_notes: c.aiStyle ? String(c.aiStyle.value || '').trim() : '',
+      enabled: !!(c.aiEnabled && c.aiEnabled.checked),
+      greet_morning: !!(c.aiMorning && c.aiMorning.checked),
+      greet_night: !!(c.aiNight && c.aiNight.checked)
+    };
+  }
+
+  /** 换服务商时：更新提示文字 + 把模型下拉换成这家的常用模型（当前模型不在列表里就换成第一家第一个） */
+  function syncProviderPick(root) {
+    const sel = root.querySelector('[data-ai-provider]');
+    if (!sel) return;
+    const provs = (window.DB.ai && window.DB.ai.providers) || [];
+    const p = provs.filter((x) => x.id === sel.value)[0] || provs[0];
+    if (!p) return;
+    const hint = root.querySelector('[data-ai-console]');
+    if (hint) hint.textContent = '钥匙在 ' + p.console + ' 创建，存进 Supabase 的 Secrets（README 第八节）';
+    const list = root.querySelector('#ai-model-list');
+    if (list) list.innerHTML = p.models.map((m) => `<option value="${esc(m)}"></option>`).join('');
+    const input = root.querySelector('[name="aiModel"]');
+    if (input) {
+      input.placeholder = p.models[0];
+      if (p.models.indexOf(input.value) < 0) input.value = p.models[0];
+    }
+  }
+
+  async function saveAi(form) {
+    const patch = readAi(form);
+    await window.DB.ai.config.save(patch);
+    if (window.App && window.App.state) {
+      window.App.state.aiConfig = Object.assign({}, window.App.state.aiConfig || {}, patch);
+    }
+    return patch;
+  }
+
+  function memFields(m) {
+    return [
+      { name: 'title', label: '一句话标题', value: (m && m.title) || '', placeholder: '她不吃香菜', required: true },
+      { name: 'kind', label: '分类', type: 'select', value: (m && m.kind) || '习惯',
+        options: ['第一次', '称呼', '习惯', '纪念日', '家人朋友', '其他'].map((k) => ({ value: k, label: k })) },
+      { name: 'content', label: '具体内容', type: 'textarea', rows: 3,
+        value: (m && m.content) || '', placeholder: '点菜的时候记得说不要香菜' },
+      { name: 'happened_on', label: '发生日期（可以空着）', type: 'date', value: (m && m.happened_on) || '' }
+    ];
   }
 
   /* ------------------------------------------------------------- 取值 */
@@ -434,6 +581,87 @@ window.Views.settings = (function () {
       }
       btn.disabled = false; btn.textContent = '💾 保存设置';
     });
+
+    /* --------------------------------------------------- AI 分身设置区 */
+    const aiForm = root.querySelector('#ai-form');
+    if (aiForm) {
+      const aiHint = (msg, ok) => {
+        const el = root.querySelector('#ai-hint');
+        if (el) { el.textContent = msg; el.style.color = ok === false ? 'var(--danger, #d33)' : ''; }
+      };
+      const memById = (id) => (ctx.aiMemories || []).find((m) => String(m.id) === String(id));
+
+      const provPick = root.querySelector('[data-ai-provider]');
+      if (provPick) provPick.addEventListener('change', () => syncProviderPick(root));
+
+      aiForm.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const btn = aiForm.querySelector('button[type="submit"]');
+        btn.disabled = true; btn.textContent = '保存中…';
+        try {
+          await saveAi(aiForm);
+          aiHint('已保存 ✓ 去上面「去聊天看看」试试', true);
+          U.toast('分身设置已保存 💗', 'success');
+        } catch (err) { aiHint(err.message, false); U.toast(err.message, 'error'); }
+        btn.disabled = false; btn.textContent = '💾 保存分身设置';
+      });
+
+      root.addEventListener('click', async (e) => {
+        const testBtn = e.target.closest('[data-ai-test]');
+        if (testBtn) {
+          testBtn.disabled = true;
+          aiHint('正在测试…');
+          try {
+            await saveAi(aiForm);
+            const r = await window.DB.ai.send('', { mode: 'ping' });
+            aiHint('✅ 通了！' + (r.providerName ? r.providerName + ' · ' : '') + '模型 ' + r.model
+              + '，今天已经聊了 ' + r.messagesToday + ' 句'
+              + (r.enabled === false ? '（不过总开关现在是关着的）' : ''), true);
+          } catch (err) { aiHint('❌ ' + err.message, false); }
+          testBtn.disabled = false;
+          return;
+        }
+
+        if (e.target.closest('[data-mem-new]')) {
+          const r = await U.formBox('加一条记忆', memFields(null), { okText: '添加' });
+          if (!r) return;
+          try {
+            await saveAi(aiForm);
+            await window.DB.ai.memories.add({ kind: r.kind, title: r.title, content: r.content, happened_on: r.happened_on || null });
+            U.toast('记下了 💗', 'success');
+            window.App.refresh();
+          } catch (err) { U.toast(err.message, 'error'); }
+          return;
+        }
+
+        const ed = e.target.closest('[data-mem-edit]');
+        if (ed) {
+          const m = memById(ed.getAttribute('data-mem-edit'));
+          if (!m) return;
+          const r = await U.formBox('改这条记忆', memFields(m), { okText: '保存' });
+          if (!r) return;
+          try {
+            await saveAi(aiForm);
+            await window.DB.ai.memories.patch(m.id, { kind: r.kind, title: r.title, content: r.content, happened_on: r.happened_on || null });
+            U.toast('改好了', 'success');
+            window.App.refresh();
+          } catch (err) { U.toast(err.message, 'error'); }
+          return;
+        }
+
+        const del = e.target.closest('[data-mem-del]');
+        if (del) {
+          const m = memById(del.getAttribute('data-mem-del'));
+          if (!m) return;
+          if (!(await U.confirmBox('删掉这条记忆？', { title: '删除', danger: true }))) return;
+          try {
+            await window.DB.ai.memories.remove(m.id);
+            U.toast('删掉了', 'success');
+            window.App.refresh();
+          } catch (err) { U.toast(err.message, 'error'); }
+        }
+      });
+    }
 
     preview(form);
   }

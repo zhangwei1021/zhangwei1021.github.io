@@ -224,7 +224,14 @@ end $$;
 -- drop policy if exists wishes_read on public.wishes;
 -- create policy wishes_read on public.wishes for select using (true);
 
+-- ---------------------------------------------------------------------------
+-- 7. 可选：AI 分身（女朋友可以和一个「AI 版的你」聊天）
+--    建表脚本单独放在同一个文件夹的 ai.sql 里，跑完本文件后如果想用这个功能，
+--    再把 ai.sql 整个粘进 SQL Editor 跑一次即可。不需要这个功能就跳过。
+-- ---------------------------------------------------------------------------
+
 -- ============================================================================
 --  完成！接着去 Authentication → Users 建两个账号（记得勾 Auto Confirm User），
 --  并在 Authentication → Sign In / Providers 里关掉「Allow new users to sign up」。
+--  （想开 AI 分身：再把 supabase/ai.sql 跑一次，然后照 README 第八节部署函数。）
 -- ============================================================================

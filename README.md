@@ -29,9 +29,12 @@ assets/js/views/gallery.js  相册（上传、筛选、设为首页、删除）
 assets/js/views/diary.js    恋爱日记（时间轴）
 assets/js/views/notes.js    悄悄话留言板
 assets/js/views/wishes.js   心愿清单
-assets/js/views/settings.js 设置（背景颜色、我们的信息、封面、音乐、密码…）
+assets/js/views/settings.js 设置（背景颜色、我们的信息、封面、音乐、密码…、AI 分身）
+assets/js/views/ai.js       AI 分身聊天页（可选功能，按第八节配置后才会出现内容）
 
 supabase/schema.sql         云端建表脚本（只在 Supabase 后台用一次）
+supabase/ai.sql             AI 分身建表脚本（可选，第八节第 1 步粘贴用）
+supabase/functions/ai-chat/index.ts   AI 分身的服务端代码（第八节第 4 步粘贴用）
 ```
 
 > ⚠️ 上传到 GitHub 时**要保持这个目录结构**（`assets` 文件夹要一起传上去），
@@ -108,11 +111,41 @@ supabase/schema.sql         云端建表脚本（只在 Supabase 后台用一次
 
 ### 4. 拿到密钥
 
-1. 左下角 **Project Settings（齿轮）→ API**
-2. 复制这两个值：
-   - **Project URL**：形如 `https://abcdefgh.supabase.co`
-   - **anon public**（`Project API keys` 里的 anon / public）：很长一串 `eyJ...`
-   - ❗️**不要**复制 `service_role` 那一串（那是管理员钥匙，泄露了别人能删库；anon 是公开的、由安全规则保护，放网页里没问题）
+> **先记住这个名字对照，别被两个名字绕晕 —— 它们指的是同一个东西：**
+>
+> | 仪表盘里叫 | 代码/弹窗里叫 | 在哪 |
+> | --- | --- | --- |
+> | **Project URL** | `SUPABASE_URL` | `https://xxxx.supabase.co` |
+> | **publishable key**（或旧的 anon / public） | `SUPABASE_ANON_KEY` | `sb_publishable_...`（或 `eyJ...`） |
+>
+> 所以：你在 Connect 弹窗里看到的 `SUPABASE_URL`，**就是**要找的 Project URL ✅
+
+Supabase 改过好几版界面，**优先用方法 A**，找不到再往下看（三种方法拿到的都是同一样东西）：
+
+**方法 A：项目页右上角的「Connect」按钮（最省事，一次拿到两样）**
+
+1. 在 Supabase 项目页面**右上角**找绿色的 **Connect** 按钮，点开
+2. 弹窗里选 **App Frameworks** 标签（默认就是它）
+3. 里面直接写着 **Project URL** 和一把 **publishable key**（`sb_publishable_...` 开头），右边各有一个复制按钮
+4. 把这两个值复制下来 —— 网站要的就是这两样
+
+**方法 B：看地址栏（界面怎么改都不会失效）**
+
+浏览器地址栏里是 `https://supabase.com/dashboard/project/abcdefgh`，
+中间那串 `abcdefgh` 就是你的项目 ID，**Project URL = `https://abcdefgh.supabase.co`**。
+（这个方法只拿到 URL，钥匙还要按方法 C 找。）
+
+**方法 C：设置页里找**
+
+1. 左下角 **Project Settings（齿轮图标）**
+2. **钥匙** 在 **API Keys** 这一页（老界面叫 **API**，两个名字都找一下）：
+   - 优先用 **Legacy API keys** 标签页里的 **anon / public**（很长一串 `eyJ...`）
+   - 如果只有 **Publishable key**（`sb_publishable_...` 开头），用它也一样，我们的代码两种都认
+   - ❗️**不要**复制 `service_role` 或 `secret` 那种管理员钥匙（泄露了别人能删库；anon / publishable 是公开的，由安全规则保护，放网页里没问题）
+   - 想核对一下 URL：**Data API** 那一页也写着 Project URL（老界面叫 **API**），和方法 B 推出来的一样；找不到这一页不影响，用方法 A 就够了
+
+> 找不到这些菜单？先看一眼左侧栏有没有 **Table Editor / SQL Editor**。
+> 如果显示的是 **New project** 按钮，说明项目还没建好（建完要等 1~2 分钟 "Setting up project" 才能看到菜单）。
 
 ### 5. 填进网站
 
@@ -121,7 +154,7 @@ supabase/schema.sql         云端建表脚本（只在 Supabase 后台用一次
 ```js
 window.APP_CONFIG = {
   supabaseUrl: 'https://abcdefgh.supabase.co',   // ← 你的 Project URL
-  supabaseAnonKey: 'eyJhbGciOi...',              // ← 你的 anon public key
+  supabaseAnonKey: 'eyJhbGciOi...',              // ← anon public（或 sb_publishable_ 开头的）
   ...
 };
 ```
@@ -157,6 +190,9 @@ window.APP_CONFIG = {
 | 记心愿 | 顶栏「心愿单」→ 添加，实现后打勾（会自动记下完成日期） |
 | 戳对方一下 | 首页点 **💗 戳一戳**；对方下次打开首页，计时器下面就会看到「×× 今天想你了 N 次」 |
 | 看往年今天 | 首页「🕰️ 去年的今天」会自动汇总这一天在往年留下的照片和日记（没有就提示你补一张） |
+| 跟 AI 分身聊天 | 顶栏「💬 AI 分身」→ 像发微信一样打字（需要先按 **第八节** 配置好） |
+| 教 AI 更像你 | 设置 → 最下面 **💬 AI 分身**：写人设、说话习惯，在「🧠 记忆清单」里加你们的小事 |
+| 让 AI 主动问候 | 设置 → AI 分身 → 勾上「早上主动道早安 / 晚上主动道晚安」，TA 打开网站时会自动收到一句 |
 | 改我们的信息 | 设置 → 我们的信息（标题、副标题、昵称、头像、纪念日、一句话签名） |
 | 换背景音乐 | 设置 → 背景音乐 → 填音乐直链或上传音频文件 |
 | 网站只让自己看 | 设置 → 「谁能浏览」选「只有登录后才能浏览」（没登录的人只能看到登录框） |
@@ -232,6 +268,109 @@ GitHub Pages 在国内时快时慢。以后如果嫌慢，可以把整个项目�
   本地模式用 `localStorage + IndexedDB`，云端模式用 Supabase PostgREST + Storage + Realtime
 - 本地模式的数据**只在自己这台浏览器**里；配置 Supabase 后不会自动迁移历史数据（重新上传即可）
 - 上传的照片会用 Canvas 先在浏览器里压缩（长边 ≤1800px），省流量、省空间
-- 云端表结构（全部带 RLS）：`members`、`settings`、`photos`、`diary_entries`、`notes`、`wishes`、`events`、`pokes`
+- 云端表结构（全部带 RLS）：`members`、`settings`、`photos`、`diary_entries`、`notes`、`wishes`、`events`、`pokes`，
+  AI 分身另加 `ai_config`、`ai_memories`、`ai_messages`（见第八节）
+- AI 分身（可选）：网页里**不存**任何模型的钥匙。钥匙放在 Supabase 的 secret 里，由 Edge Function
+  `ai-chat`（`supabase/functions/ai-chat/index.ts`）代网站去调用大模型 —— 别人翻网页源码也拿不到你的 key；
+  支持 DeepSeek 官方与阿里云百炼两家（都是 OpenAI 兼容接口，换 base_url + 钥匙 + 模型名即可）；
+  聊天记录存 `ai_messages`，RLS 保护，只有你们两个人能读
+
+## 八、想加「AI 分身」？（可选：让 TA 能跟「AI 版的你」聊天）
+
+这一步**是可选的**。不做的话网站一切照常，只是点开「💬 AI 分身」会看到一张安装说明卡片。
+做好了以后：TA 打开顶栏的「💬 AI 分身」，就能像发微信一样跟一个「AI 版的你」聊天；
+早上或晚上第一次打开，它还会主动说一句早安/晚安。
+
+> 它不是把你的聊天记录拿去训练模型，而是「让通用的 AI 照着你的**人设 + 记忆**说话」——
+> 你说它该怎么说话、你们有哪些小事，它就照这些回答，不会自己乱编。
+
+总共 4 件事，全程在网页上点，**不用装任何软件**：
+
+| 要准备的东西 | 在哪 | 花多久 |
+| --- | --- | --- |
+| **模型钥匙**（AI 的大脑，两家选一家） | DeepSeek 官方 platform.deepseek.com，或 阿里云百炼 bailian.console.aliyun.com | 3 分钟 |
+| 跑一次 `supabase/ai.sql` | Supabase → SQL Editor | 1 分钟 |
+| 把钥匙存进 Supabase secret | Supabase → Edge Functions → Secrets | 1 分钟 |
+| 部署 `ai-chat` 函数 | Supabase → Edge Functions | 3 分钟 |
+
+### 第 1 步：建表
+Supabase → 左边 **SQL Editor** → **New query** → 把 `supabase/ai.sql` 全部内容粘进去 → **Run**。
+**应该看到**：`Success. No rows returned`。（这个文件可以重复跑，不会弄坏已有数据。）
+> 之前跑过旧版的话，**再跑一次**就好——新版多了「用哪家模型」这一列。
+
+### 第 2 步：拿一把模型钥匙（两家选一家，都行）
+
+| 选哪家 | 去哪拿 | 钥匙长什么样 | 推荐模型 |
+| --- | --- | --- | --- |
+| **A. DeepSeek 官方** | https://platform.deepseek.com/ → API keys | `sk-` 开头 | `deepseek-flash`（快、便宜） |
+| **B. 阿里云百炼** | https://bailian.console.aliyun.com/ → 右上角头像 → **API-KEY** → 创建 | `sk-` 开头（比 DeepSeek 的长） | `qwen-plus`（够用、便宜），想更聪明用 `qwen-max` |
+
+**两家都怎么选：**
+- 只想快点跑通、没注册过任何一家 → 选 **A. DeepSeek 官方**（注册最简单，充 ¥10 能用很久）。
+- 已经在用阿里云百炼（比如你手上有百炼的 key、或者账户里有额度）→ 选 **B. 阿里云百炼**，不用再注册一家。
+- 两个都想要也行：两把钥匙都存进 Supabase（不同名字），网站「设置 → AI 分身 → 用哪家的模型」里随时切换。
+
+> ⚠️ 百炼的钥匙是**分地域**的：北京地域的 key 只能配北京地域的地址。默认的
+> `dashscope.aliyuncs.com` 就是北京，直接用即可；如果你用的是新加坡等地，需要在 Supabase 里
+> 额外加一个 secret `AI_BASE_URL`（看下面第 3 步的说明）。
+> 另外百炼里要**先在「模型广场」开通**你要用的模型（qwen 系列默认开通，DeepSeek 系列需要手动开通）。
+
+### 第 3 步：把钥匙存进 Supabase
+Supabase → 左边 **Edge Functions** → 上方 **Secrets** → **Add new secret**，名字按你选的那家填：
+
+| 你选的是 | Name 填 | Value 填 |
+| --- | --- | --- |
+| A. DeepSeek 官方 | `DEEPSEEK_API_KEY` | 刚复制的 `sk-...` |
+| B. 阿里云百炼 | `DASHSCOPE_API_KEY` | 刚复制的 `sk-...` |
+| 两家都想用 / 懒得记 | `AI_API_KEY` | 任意一家的 key（这个名字优先级最高） |
+
+**应该看到**：列表里出现你刚加的那一行（只能看到名字，看不到内容，这是正常的）。
+
+可选的额外 secret（不填也能跑）：
+- `AI_MODEL`：强制指定模型名，比如 `qwen-plus`（会盖掉网站上选的）
+- `AI_BASE_URL`：自定义接口地址，例如百炼的业务空间专属域名
+  `https://<你的WorkspaceId>.cn-beijing.maas.aliyuncs.com/compatible-mode/v1`
+
+### 第 4 步：部署 ai-chat 函数
+1. Supabase → 左边 **Edge Functions** → **Deploy a new function**
+2. 选 **Via Editor**（在网页里直接粘代码，不需要命令行）
+3. **Function name** 填 `ai-chat`（一字不差）
+4. 把 `supabase/functions/ai-chat/index.ts` 的内容整个粘进编辑器（**把里面自带的示例代码全部替换掉**）
+5. 点 **Deploy function**，等 10~30 秒
+**应该看到**：函数列表里出现 `ai-chat`，状态是绿色的 **ACTIVE**，点开还有 **Test** 按钮。
+以后如果你改了这个文件，重新粘一次 → 点 **Deploy updates** 即可。
+
+### 第 5 步：回网站写人设（最花心思、也最值得的一步）
+登录网站 → **设置** → 拉到最下面 **💬 AI 分身**：
+- 「这个分身代表谁」选你自己（比如 Zzzw）
+- **「用哪家的模型」**选你第 2 步选的那家（DeepSeek 官方 / 阿里云百炼），右边「用哪个模型」填或选模型名
+  （DeepSeek 官方：`deepseek-flash`；百炼：`qwen-plus`）
+- **人设**：你平时怎么说话、怎么称呼她、她在意什么、她累的时候你一般怎么说
+- **说话习惯**：口头禅、不要出现的腔调（比如别用「亲爱的用户」这种）
+- **🧠 记忆清单**：点「＋ 添加记忆」，一条一条加你们的小事——她不吃什么、第一次见面在哪、
+  她的生日、她生气时该怎么办、你们常去的店……（加得越多，它越像你）
+- 点 **💾 保存分身设置**，再点 **🔌 测试连接**
+**应该看到**：`✅ 通了！DeepSeek 官方 · 模型 deepseek-flash，今天已经聊了 0 句`
+（或 `阿里云百炼 · 模型 qwen-plus`）。然后让 TA 打开「💬 AI 分身」就能聊了 🎉
+
+### 出问题看这里
+| 现象 | 原因 / 怎么办 |
+| --- | --- |
+| 测试连接报「还联系不上 AI 分身」 | 第 4 步没成功：Edge Functions 里要有 `ai-chat` 且是绿色 ACTIVE，名字必须一模一样 |
+| 报「relation "public.ai_config" does not exist」 | 第 1 步没跑：回去跑一遍 `supabase/ai.sql` |
+| 报「column "provider" does not exist」 | 旧的 ai.sql 跑过、新版没跑：再粘一次 `supabase/ai.sql` 跑一遍即可 |
+| 报「钥匙不对 / 401」 | ① secret 名字对不上你选的那家（DeepSeek 官方要 `DEEPSEEK_API_KEY`，百炼要 `DASHSCOPE_API_KEY`）；② 值前后有空格；③ 百炼的 key 是分地域的，跨地域会报 `invalid_api_key` |
+| 报「找不到这个模型 / 404」 | 「用哪个模型」的模型名和这家服务商对不上：DeepSeek 官方填 `deepseek-flash`，百炼填 `qwen-plus`；百炼里还要先在模型广场**开通**该模型 |
+| 报「余额不足 / 402」 | 那家账户没钱了，去充值 |
+| 报「今天聊得有点多 / 429」 | 到每天上限了（设置页可改，默认 60 句；AI 主动问候不占额度） |
+| 想让它更聪明 | DeepSeek 官方换 `deepseek-v4-pro`，百炼换 `qwen-max`（都贵一些） |
+| 聊天记录在哪 | Supabase 的 `ai_messages` 表里，只有你们两个人能看（RLS 保护） |
+| 不想用了 | 设置里取消勾选「开启 AI 分身」；或在 Supabase 里删掉 `ai-chat` 函数 |
+
+> 💡 想让 AI 更像你：把你们的聊天记录导出成 txt（QQ 消息记录导出 / 微信复制粘贴都行，
+> 300~1000 条就够），**先把地址、身份证、银行卡这类内容删掉**，再发给我，我帮你把它提炼成
+> 人设和「记忆清单」，你过目后再填进设置页。
+
+---
 
 祝你们长长久久 💗

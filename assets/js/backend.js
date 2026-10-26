@@ -15,9 +15,12 @@ window.DB = (function () {
     wishes: 'love.wishes',
     events: 'love.events',
     pokes: 'love.pokes',
-    identity: 'love.identity'
+    identity: 'love.identity',
+    aiConfig: 'love.ai.config',
+    aiMemories: 'love.ai.memories',
+    aiMessages: 'love.ai.messages'
   };
-  const TABLES = ['settings', 'photos', 'diary_entries', 'notes', 'wishes', 'events', 'pokes'];
+  const TABLES = ['settings', 'photos', 'diary_entries', 'notes', 'wishes', 'events', 'pokes', 'ai_messages'];
 
   let sb = null;                 // supabase client
   let mode = 'local';
@@ -359,6 +362,107 @@ window.DB = (function () {
   });
 
   /* ------------------------------------------------------- 媒体（音/图） */
+  /* ------------------------------------------------------------ AI 分身 */
+  const AI_DEFAULTS = {
+    owner: 'A',
+    provider: 'deepseek',
+    persona: '',
+    style_notes: '',
+    model: 'deepseek-flash',
+    daily_limit: 60,
+    greet_morning: true,
+    greet_night: true,
+    enabled: true
+  };
+
+  /** 服务商信息（网页里只用来显示名字和推荐模型，钥匙永远在服务端） */
+  const AI_PROVIDERS = [
+    {
+      id: 'deepseek', name: 'DeepSeek 官方',
+      console: 'platform.deepseek.com',
+      models: ['deepseek-flash', 'deepseek-v4-pro', 'deepseek-chat', 'deepseek-reasoner']
+    },
+    {
+      id: 'bailian', name: '阿里云百炼',
+      console: 'bailian.console.aliyun.com',
+      models: ['qwen-plus', 'qwen-max', 'qwen-turbo', 'qwen-long', 'deepseek-v3', 'deepseek-r1']
+    }
+  ];
+
+  function translateAiError(msg) {
+    const m = String(msg || '');
+    if (/Failed to send a request|Failed to fetch|not found|404|Edge Function/i.test(m)) {
+      return '还联系不上 AI 分身：函数可能还没部署好（看 README 第八节），或者网络被挡住了。';
+    }
+    if (/JWT|401|Unauthorized/i.test(m)) return '登录状态过期了，重新登录一下再试～';
+    return m || '出了点问题，再试一次吧～';
+  }
+
+  const ai = {
+    defaults: AI_DEFAULTS,
+    providers: AI_PROVIDERS,
+    /** AI 分身只有云端模式能用（需要 Edge Function 转发，钥匙不能放网页里） */
+    available() { return isCloud(); },
+
+    config: {
+      async get() {
+        if (!isCloud()) return Object.assign({}, AI_DEFAULTS, lsGet(LS.aiConfig, {}));
+        const { data, error } = await sb.from('ai_config').select('*').eq('id', 1).limit(1);
+        if (error) { console.warn('[ai.config]', error.message); return Object.assign({}, AI_DEFAULTS); }
+        return Object.assign({}, AI_DEFAULTS, (data && data[0]) || {});
+      },
+      async save(patch) {
+        if (!isCloud()) {
+          lsSet(LS.aiConfig, Object.assign(lsGet(LS.aiConfig, {}), patch));
+          emit('ai_config');
+          return;
+        }
+        const row = Object.assign({ id: 1 }, patch, { updated_at: new Date().toISOString() });
+        const { error } = await sb.from('ai_config').upsert(row, { onConflict: 'id' });
+        if (error) throw new Error('保存失败：' + error.message + (/(does not exist|schema cache)/i.test(error.message) ? '（是不是还没跑、或者需要重跑一次 supabase/ai.sql？）' : ''));
+        emit('ai_config');
+      }
+    },
+
+    memories: makeCRUD('ai_memories', 'aiMemories', 'created_at'),
+
+    /** 最近的聊天记录（旧在前，方便直接铺到页面上） */
+    async history(limit) {
+      const n = limit || 60;
+      if (!isCloud()) return lsGet(LS.aiMessages, []).slice(-n);
+      const { data, error } = await sb.from('ai_messages').select('*')
+        .order('created_at', { ascending: false }).limit(n);
+      if (error) throw new Error('读取聊天记录失败：' + error.message);
+      return (data || []).slice().reverse();
+    },
+
+    /** 发一句话给分身：走 Edge Function（钥匙在服务端，网页里没有） */
+    async send(text, opts) {
+      if (!isCloud()) throw new Error('AI 分身需要云端模式：先在 config.js 里填好 Supabase 配置');
+      const body = Object.assign({ message: text }, opts || {});
+      const { data, error } = await sb.functions.invoke('ai-chat', { body });
+      if (error) {
+        let msg = error.message || '请求失败';
+        try {
+          if (error.context && typeof error.context.json === 'function') {
+            const j = await error.context.json();
+            if (j && j.error) msg = j.error;
+          }
+        } catch (e) { /* 拿不到就用手里的信息 */ }
+        throw new Error(translateAiError(msg));
+      }
+      if (data && data.error) throw new Error(data.error);
+      return data || {};
+    },
+
+    async clear() {
+      if (!isCloud()) { lsSet(LS.aiMessages, []); emit('ai_messages'); return; }
+      const { error } = await sb.from('ai_messages').delete().gte('created_at', '1970-01-01T00:00:00Z');
+      if (error) throw new Error('清空失败：' + error.message);
+      emit('ai_messages');
+    }
+  };
+
   const media = {
     /**
      * @param {File} file
@@ -391,7 +495,7 @@ window.DB = (function () {
 
   /* --------------------------------------------------------------- 导出 */
   return {
-    init, isCloud, client, auth, identity, me, settings, photos, diary, wishes, events, notes, pokes, media,
+    init, isCloud, client, auth, identity, me, settings, photos, diary, wishes, events, notes, pokes, media, ai,
     on(fn) { changeHandlers.add(fn); },
     emit(table) { emit(table); },
     get cdnFailed() { return cdnFailed; },

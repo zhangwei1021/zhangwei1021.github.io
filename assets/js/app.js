@@ -24,6 +24,8 @@ window.App = (function () {
     wishes: [],
     events: [],
     pokes: [],
+    aiConfig: null,     // AI 分身设置（人设、模型、限额）
+    aiMemories: [],     // 记忆清单
     route: 'home',
     galFilter: '',
     homeTag: '',
@@ -35,6 +37,7 @@ window.App = (function () {
     { id: 'gallery',  hash: '#/gallery',  label: '相册',   icon: '📷', view: 'gallery' },
     { id: 'diary',    hash: '#/diary',    label: '日记',   icon: '✍️', view: 'diary' },
     { id: 'notes',    hash: '#/notes',    label: '悄悄话', icon: '💌', view: 'notes' },
+    { id: 'ai',       hash: '#/ai',       label: 'AI 分身', icon: '💬', view: 'ai' },
     { id: 'wishes',   hash: '#/wishes',   label: '心愿单', icon: '🌟', view: 'wishes' },
     { id: 'settings', hash: '#/settings', label: '设置',   icon: '⚙️', view: 'settings' }
   ];
@@ -253,6 +256,7 @@ window.App = (function () {
   async function loadData() {
     if (state.locked) {
       state.photos = []; state.diary = []; state.notes = []; state.wishes = []; state.events = []; state.pokes = [];
+      state.aiConfig = null; state.aiMemories = [];
       return;
     }
     const safe = (p) => p.catch((e) => { console.warn(e); return []; });
@@ -266,6 +270,8 @@ window.App = (function () {
     state.wishes = wishes || [];
     state.events = events || [];
     state.pokes = pokes || [];
+    try { state.aiConfig = await DB.ai.config.get(); } catch (e) { console.warn(e); state.aiConfig = null; }
+    state.aiMemories = await DB.ai.memories.list().catch((e) => { console.warn(e); return []; });
   }
 
   let refreshing = false, pendingRefresh = false;
