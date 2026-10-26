@@ -1,12 +1,99 @@
 <!DOCTYPE html>
-<html lang="zh-CN">
+<html lang="zh-CN" data-mode="light" data-bg="gradient">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>辱骂张珂的网站</title>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#ff6f91">
+<title>我们的恋爱日常</title>
+<meta name="description" content="记录我们在一起的每一天 💗">
+<meta name="referrer" content="no-referrer">
+
+<!-- 分享到微信/朋友圈时的样子 -->
+<meta property="og:type" content="website">
+<meta property="og:title" content="我们的恋爱日常">
+<meta property="og:description" content="记录我们在一起的每一天 💗">
+<meta property="og:url" content="https://zwandzky.me/">
+<meta name="twitter:card" content="summary_large_image">
+
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>💗</text></svg>">
+<link rel="apple-touch-icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>💗</text></svg>">
+<link rel="stylesheet" href="assets/css/style.css?v=1">
 </head>
 <body>
-  <h1>张珂是个大傻逼</h1>
-  <p>纯纯双标怪的傻逼</p>
+
+<div id="app">
+  <div id="topbar-slot"></div>
+  <main class="wrap" id="view">
+    <div style="display:grid;place-items:center;min-height:60vh;gap:14px">
+      <div class="spin"></div>
+      <div style="color:var(--muted);font-size:13.5px">正在打开我们的故事…</div>
+    </div>
+  </main>
+  <div id="footer-slot"></div>
+</div>
+
+<!-- 右下角音乐播放器 / 大图查看器 的容器 -->
+<div id="music-slot"></div>
+<div id="zoom-slot"></div>
+
+<!-- 弹窗与提示（脚本会往里面塞内容） -->
+<div id="modal-wrap" hidden></div>
+<div id="toast-wrap"></div>
+
+<noscript>
+  <div class="wrap" style="padding:40px 20px;text-align:center">
+    这个网站需要打开 JavaScript 才能显示 💗
+  </div>
+</noscript>
+
+<!-- =====================================================================
+     1) Supabase SDK（多个 CDN 依次尝试，失败了也能用本地模式打开）
+     ===================================================================== -->
+<script>
+window.__SUPABASE_READY = (function () {
+  var urls = [
+    'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.js',
+    'https://unpkg.com/@supabase/supabase-js@2.45.4/dist/umd/supabase.js',
+    'https://cdn.bootcdn.net/ajax/libs/supabase-js/2.45.4/supabase.js',
+    'https://cdnjs.cloudflare.com/ajax/libs/supabase-js/2.45.4/supabase.js'
+  ];
+  return new Promise(function (resolve) {
+    var i = 0;
+    function ok() { return !!(window.supabase && window.supabase.createClient); }
+    function next() {
+      if (ok()) return resolve(true);
+      if (i >= urls.length) { console.warn('[SDK] Supabase 没加载出来，先用本地模式'); return resolve(false); }
+      var s = document.createElement('script');
+      var settled = false;
+      s.src = urls[i++];
+      s.async = true;
+      s.onload = function () { if (!settled) { settled = true; ok() ? resolve(true) : next(); } };
+      s.onerror = function () { if (!settled) { settled = true; s.remove(); next(); } };
+      document.head.appendChild(s);
+      setTimeout(function () { if (!settled) { settled = true; s.remove(); next(); } }, 7000);
+    }
+    next();
+  });
+})();
+</script>
+
+<!-- =====================================================================
+     2) 站点脚本（顺序不能改）
+     ===================================================================== -->
+<script src="assets/js/config.js?v=1"></script>
+<script src="assets/js/util.js?v=1"></script>
+<script src="assets/js/idb.js?v=1"></script>
+<script src="assets/js/backend.js?v=1"></script>
+<script src="assets/js/theme.js?v=1"></script>
+<!-- 页面视图 -->
+<script src="assets/js/views/home.js?v=1"></script>
+<script src="assets/js/views/gallery.js?v=1"></script>
+<script src="assets/js/views/diary.js?v=1"></script>
+<script src="assets/js/views/notes.js?v=1"></script>
+<script src="assets/js/views/wishes.js?v=1"></script>
+<script src="assets/js/views/settings.js?v=1"></script>
+<!-- 主控（必须最后） -->
+<script src="assets/js/app.js?v=1"></script>
+<script>window.App.boot();</script>
 </body>
 </html>
