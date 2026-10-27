@@ -130,8 +130,10 @@ window.Views.home = (function () {
           ${ctx.canEdit
             ? `<button class="btn btn--primary" data-act="upload">📷 传照片</button>
                <button class="btn" data-act="diary">✍️ 写日记</button>
-               <button class="btn btn--ghost" data-act="settings">⚙️ 设置</button>`
-            : `<button class="btn btn--primary" data-act="gallery">📷 看相册</button>`}
+               <button class="btn btn--ghost" data-act="settings">⚙️ 设置</button>
+               <button class="btn btn--ghost" data-act="bless">🎁 祝福墙</button>`
+            : `<button class="btn btn--primary" data-act="gallery">📷 看相册</button>
+               <button class="btn btn--bless" data-act="bless">💌 送一句祝福</button>`}
         </div>
       </div>
     </section>
@@ -196,6 +198,36 @@ window.Views.home = (function () {
              <div class="empty__title">照片墙还是空的</div>
              <div class="empty__desc">${ctx.canEdit ? '上传第一张照片，然后在相册里点「🏠」把它放到首页' : 'TA 还没有挑选要展示的照片'}</div>
              ${ctx.canEdit ? '<button class="btn btn--primary" data-act="upload">上传照片</button>' : ''}
+           </div>`}
+    </section>
+
+    ${blessSection(ctx)}`;
+  }
+
+  /* ---------------- 祝福墙 💌（访客留言） ---------------- */
+  function blessSection(ctx) {
+    const list = (ctx.blessings || []).slice().sort(
+      (a, b) => String(b.created_at || '').localeCompare(String(a.created_at || ''))
+    );
+    const card = window.Views.bless && window.Views.bless.cardHtml;
+    const shown = list.slice(0, 3);
+    return `
+    <section class="section">
+      <div class="section__head">
+        <h2 class="section__title">💌 祝福墙</h2>
+        <p class="section__desc">${list.length ? `已经收到 <b>${list.length}</b> 条祝福` : '来做客的朋友，可以在这里留一句话'}</p>
+        <div class="section__actions">
+          <button class="btn btn--primary btn--sm" data-act="bless">💌 送一句祝福</button>
+          ${list.length > 3 ? '<button class="btn btn--ghost btn--sm" data-act="bless-all">看全部 →</button>' : ''}
+        </div>
+      </div>
+      ${shown.length && card
+        ? `<div class="bless-wall stagger">${shown.map((b) => card(b, ctx)).join('')}</div>`
+        : `<div class="empty card card--pad">
+             <div class="empty__icon">🎁</div>
+             <div class="empty__title">还没有人留言</div>
+             <div class="empty__desc">不用注册也能写，留个昵称或者匿名都行</div>
+             <button class="btn btn--primary" data-act="bless">💌 写第一句祝福</button>
            </div>`}
     </section>`;
   }
@@ -408,6 +440,14 @@ window.Views.home = (function () {
       if (act === 'diary') location.hash = '#/diary?new=1';
       if (act === 'settings') location.hash = '#/settings';
       if (act === 'gallery') location.hash = '#/gallery';
+      if (act === 'bless' || act === 'bless-all') {
+        location.hash = '#/bless';
+        setTimeout(() => {
+          const f = document.querySelector('#bless-form [name="content"]');
+          if (f && act === 'bless') f.focus();
+        }, 260);
+        return;
+      }
       if (act === 'poke') { doPoke(t, ctx); return; }
       if (act === 'toggle-ms') { ctx.showAllMs = !ctx.showAllMs; window.App.render(); }
     });

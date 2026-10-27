@@ -19,9 +19,10 @@ window.DB = (function () {
     aiConfig: 'love.ai.config',
     aiMemories: 'love.ai.memories',
     aiMessages: 'love.ai.messages',
-    trips: 'love.trips'
+    trips: 'love.trips',
+    blessings: 'love.blessings'
   };
-  const TABLES = ['settings', 'photos', 'diary_entries', 'notes', 'wishes', 'events', 'pokes', 'ai_messages', 'trips'];
+  const TABLES = ['settings', 'photos', 'diary_entries', 'notes', 'wishes', 'events', 'pokes', 'ai_messages', 'trips', 'blessings'];
 
   let sb = null;                 // supabase client
   let mode = 'local';
@@ -411,6 +412,34 @@ window.DB = (function () {
     }
   });
 
+  /* ------------------------------------------------- 祝福留言板（访客可写） */
+  const BLESS_MAX = 300;
+  const BLESS_NAME_MAX = 24;
+
+  const blessings = Object.assign(makeCRUD('blessings', 'blessings', 'created_at'), {
+    MAX: BLESS_MAX,
+    NAME_MAX: BLESS_NAME_MAX,
+    /** 最近 N 条（祝福按时间倒序，墙上最新的在上面） */
+    async recent(limit) {
+      const arr = await blessings.list();
+      return arr.slice(0, limit || 200);
+    },
+    /** 访客也能调用：昵称留空 = 匿名 */
+    async addBless(input) {
+      const isAnon = !!input.is_anon || !String(input.name || '').trim();
+      const name = isAnon ? '' : String(input.name).trim().slice(0, BLESS_NAME_MAX);
+      const content = String(input.content || '').trim();
+      if (content.length < 1) throw new Error('写点什么再送出去吧 💗');
+      if (content.length > BLESS_MAX) throw new Error('太长了，最多 ' + BLESS_MAX + ' 个字');
+      return blessings.add({
+        name: name,
+        content: content,
+        is_anon: isAnon,
+        ua: (navigator.userAgent || '').slice(0, 180)
+      });
+    }
+  });
+
   /* ------------------------------------------------------- 媒体（音/图） */
   /* ------------------------------------------------------------ AI 分身 */
   const AI_DEFAULTS = {
@@ -545,7 +574,7 @@ window.DB = (function () {
 
   /* --------------------------------------------------------------- 导出 */
   return {
-    init, isCloud, client, auth, identity, me, settings, photos, diary, wishes, events, notes, pokes, trips, media, ai,
+    init, isCloud, client, auth, identity, me, settings, photos, diary, wishes, events, notes, pokes, trips, blessings, media, ai,
     on(fn) { changeHandlers.add(fn); },
     emit(table) { emit(table); },
     get cdnFailed() { return cdnFailed; },

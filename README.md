@@ -29,6 +29,7 @@ assets/js/views/gallery.js  相册（上传、筛选、设为首页、删除）
 assets/js/views/diary.js    恋爱日记（时间轴）
 assets/js/views/notes.js    悄悄话留言板
 assets/js/views/wishes.js   心愿清单
+assets/js/views/bless.js    祝福墙（访客不用登录就能留言，可匿名）
 assets/js/views/map.js      旅行轨迹（中国地图打卡，点省份看第一次去的时间 / 次数 / 照片）
 assets/js/china-map.js      中国地图数据（34 个省轮廓，离线可用，不用连网）
 assets/js/views/settings.js 设置（背景颜色、我们的信息、封面、音乐、密码…、AI 分身）
@@ -44,6 +45,7 @@ assets/img/buddy-him-soft.jpg  备选形象：小清新
 
 supabase/schema.sql         云端建表脚本（只在 Supabase 后台用一次）
 supabase/trips.sql          旅行轨迹建表脚本（用「🗺️ 旅行轨迹」就要跑一次，第三节第 2 步）
+supabase/bless.sql          祝福墙建表脚本（用「🎁 祝福墙」就要跑一次，第三节第 2 步）
 supabase/ai.sql             AI 分身建表脚本（可选，第八节第 1 步粘贴用）
 supabase/ai-persona.sql     现成的人设 + 10 条记忆（可选，第八节第 5 步可一键导入）
 supabase/functions/ai-chat/index.ts   AI 分身的服务端代码（第八节第 4 步粘贴用）
@@ -111,6 +113,8 @@ supabase/functions/ai-chat/index.ts   AI 分身的服务端代码（第八节第
 4. 点右下角 **Run**（或按 `Ctrl + Enter`），看到 Success 就成功了
 5. **再跑一个旅行轨迹的脚本**：把 `supabase/trips.sql` 全选复制 → SQL Editor 里 **New query** → 粘贴 → **Run**
    （这个脚本负责「🗺️ 旅行轨迹」的地图打卡和照片的城市标签；跑完网站里才能打卡）
+6. **再跑一个祝福墙的脚本**：把 `supabase/bless.sql` 全选复制 → **New query** → 粘贴 → **Run**
+   （这个脚本让「🎁 祝福墙」能被访客留言；跑完访客才能写祝福，你们俩还能删掉不合适的话）
    > 用了 AI 分身的话，`supabase/ai.sql` 也是同样的跑法（见第八节第 1 步）。
 
 > 这些脚本都可以重复运行，不会清空已有数据。以后想加功能，改完再 Run 一次。
@@ -221,6 +225,8 @@ window.APP_CONFIG = {
 | 放好几首歌 | 设置 → 背景音乐 → **播放列表** 里可以一直 **＋ 添加一首**（也能上传 mp3），每首都能改名字/歌手、上移下移、删除 |
 | 选播放方式 | 设置 → 背景音乐 → **播放方式**：顺序播放 / 列表循环（放完回到第一首）/ 单曲循环 / 随机播放；播放器上那个按钮点一下也能换 |
 | 网站只让自己看 | 设置 → 「谁能浏览」选「只有登录后才能浏览」（没登录的人只能看到登录框） |
+| 让亲友留祝福 | 把网址发给亲友：**不用注册、不用登录**，打开首页点 **💌 送一句祝福**（或顶栏「🎁 祝福墙」）→ 写昵称、写一句话，想匿名就勾「匿名送出」→ 送出后立刻出现在墙上，也会显示在首页底部 |
+| 删掉不合适的祝福 | 你们俩登录后进「🎁 祝福墙」，每条祝福右下角有 🗑️（访客看不到这个按钮）。另外同一个浏览器 20 秒内只能发一条，防止刷屏 |
 | 改密码 | 设置页最下面 → 填新密码 → 「修改我的密码」（或在 Supabase 后台 Users 里 Reset password） |
 | 手机上像 App 一样用 | 手机浏览器打开网站 → 分享 → 「添加到主屏幕」 |
 
@@ -264,6 +270,15 @@ window.APP_CONFIG = {
 两种常见原因：①手机/浏览器不允许自动播放，点一下右下角播放器的 ▶ 就行；
 ②填的音乐地址不是**直链**（要以 `.mp3` / `.m4a` 这类结尾，网盘分享链接不行）—— 最稳的办法是在设置里**上传音频文件**。
 播放器上还能切「顺序 / 列表循环 / 单曲循环 / 随机」；列表里有好几首时，右侧会显示 `1/3` 这样的第几首。
+
+**Q：访客写的祝福发不出去？**
+页面提示「发送失败」时，八成是 `supabase/bless.sql` 还没跑（报错里会有 `relation "public.blessings" does not exist`）；
+另外内容不能为空、最多 300 字，昵称最多 24 字，同一个浏览器 20 秒内只能发一条。
+如果提示「留言功能暂时无法使用」，说明网站还在**本地模式**（没配 Supabase），本地模式下祝福墙只能在自己的浏览器里看。
+
+**Q：祝福墙会被发广告吗？**
+访客只能「新增」和「看」，**不能删也不能改**；删留言的权限只在你们俩登录后才有（每条右下角 🗑️）。
+真被刷了就直接删掉，或者在 `supabase/bless.sql` 里把 `anon` 那条 insert 策略删掉、再 Run 一次，就彻底不让访客写了。
 
 **Q：两个人看到的数据不一样？**
 一方没登录（本地模式的数据不会上传），或者一方还没刷新。云端模式是实时的，
@@ -310,9 +325,12 @@ GitHub Pages 在国内时快时慢。以后如果嫌慢，可以把整个项目�
   本地模式用 `localStorage + IndexedDB`，云端模式用 Supabase PostgREST + Storage + Realtime
 - 本地模式的数据**只在自己这台浏览器**里；配置 Supabase 后不会自动迁移历史数据（重新上传即可）
 - 上传的照片会用 Canvas 先在浏览器里压缩（长边 ≤1800px），省流量、省空间
-- 云端表结构（全部带 RLS）：`members`、`settings`、`photos`、`diary_entries`、`notes`、`wishes`、`events`、`pokes`、`trips`
-  （旅行打卡，另有 `photos.city` / `photos.province` 两个字段记城市），
+- 云端表结构（全部带 RLS）：`members`、`settings`、`photos`、`diary_entries`、`notes`、`wishes`、`events`、`pokes`、`trips`、`blessings`
+  （旅行打卡，另有 `photos.city` / `photos.province` 两个字段记城市；`blessings` 是访客祝福墙），
   AI 分身另加 `ai_config`、`ai_memories`、`ai_messages`（见第八节）
+- 祝福墙是**唯一允许访客（未登录）写入**的表：`blessings` 上只开了一条 `insert` 给 `anon`，
+  并且数据库层面就限死了长度（内容 1~300 字、昵称 ≤24 字）；`select` 公开，`delete/update` 只给成员。
+  访客提交时带一个隐藏的 `ua` 字段，前端另有 20 秒冷却（`localStorage`），双保险防刷
 - 旅行地图**不连网**：34 个省的轮廓已经提前算好存在 `assets/js/china-map.js` 里（等距圆柱投影 + 抽稀，
   约 145 KB），所以断网、CDN 抽风都能正常点亮
 - 背景音乐是**浏览器自己放**的：多首播放列表 + 顺序/列表循环/单曲循环/随机四种模式都由 `app.js` 的播放器管；

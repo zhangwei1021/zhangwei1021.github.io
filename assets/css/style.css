@@ -134,6 +134,13 @@ p { margin: 0 0 .6em; }
   .nav__link { padding: 7px 9px; font-size: 13.5px; }
   .brand__name { max-width: 26vw; }
 }
+/* 导航已经有 9 项了：再窄一点就把内边距和字号再压一档，别把「设置」挤出去 */
+@media (max-width: 1060px) {
+  .nav__link { padding: 6px 7px; font-size: 12.8px; }
+  .brand__name { max-width: 20vw; }
+  .who { padding: 3px 9px 3px 3px; }
+  .who__name { font-size: 12.5px; }
+}
 @media (max-width: 980px) {
   .topbar__inner { flex-wrap: wrap; height: auto; min-height: 62px; padding: 8px 0 6px; gap: 8px; }
   .nav { order: 3; width: 100%; margin-left: 0; flex-wrap: wrap; overflow: visible; }
@@ -844,9 +851,8 @@ button.avatar-pick { border: 0; background: transparent; padding: 0; cursor: poi
 }
 
 @media (max-width: 760px) {
-  /* 导航多了一个入口：放不下就横向滑动，别挤成两行 */
-  .nav { flex-wrap: nowrap; overflow-x: auto; -webkit-overflow-scrolling: touch; scrollbar-width: none; }
-  .nav::-webkit-scrollbar { display: none; }
+  /* 手机上导航有 9 个入口：宁可折成两行，也不要藏起「设置」——折行比横向滑动更容易发现 */
+  .nav { flex-wrap: wrap; overflow: visible; }
   .nav__link { white-space: nowrap; }
   .chat__body { max-width: 84%; }
   .chat__list { max-height: none; padding: 14px 12px 8px; }
@@ -1163,4 +1169,102 @@ button.avatar-pick { border: 0; background: transparent; padding: 0; cursor: poi
   .mapwrap { grid-template-columns: 1fr; }
   .mappanel { position: static; }
   .mapph { grid-template-columns: repeat(4, 1fr); }
+}
+/* =========================================================================
+ *  祝福墙 💌（访客留言板）
+ * ========================================================================= */
+.btn--bless {
+  background: var(--surface);
+  border: 1.5px solid var(--accent);
+  color: var(--accent-ink);
+  font-weight: 700;
+}
+.btn--bless:hover { background: var(--accent-soft); }
+
+.bless-hero {
+  display: flex; align-items: center; gap: 18px;
+  margin-bottom: 18px;
+  background: linear-gradient(120deg, var(--accent-soft), var(--surface) 72%);
+  border: 1px solid var(--accent-line);
+}
+.bless-hero__title { font-size: 18px; font-weight: 800; margin-bottom: 6px; }
+.bless-hero__sub { font-size: 13.5px; line-height: 1.8; color: var(--muted); }
+.bless-hero__ico {
+  font-size: 40px; line-height: 1;
+  flex: 0 0 auto;
+  filter: drop-shadow(0 6px 14px rgba(255, 111, 145, .35));
+}
+
+.bless-form-wrap { margin-bottom: 20px; }
+.bless-row { display: flex; align-items: flex-end; gap: 16px; flex-wrap: wrap; }
+.bless-anon {
+  white-space: nowrap; padding-bottom: 9px;
+  font-size: 14px; color: var(--text);
+}
+.input.is-off { opacity: .45; }
+.bless-hp { position: absolute; left: -9999px; width: 1px; height: 1px; opacity: 0; }
+.bless-actions {
+  display: flex; align-items: center; gap: 12px; flex-wrap: wrap; margin-top: 4px;
+}
+.bless-tip { font-size: 12.5px; color: var(--muted); }
+.bless-tip.is-ok { color: var(--ok); font-weight: 700; }
+
+.bless-wall {
+  display: grid; gap: 14px;
+  grid-template-columns: repeat(auto-fill, minmax(268px, 1fr));
+}
+.bless {
+  position: relative;
+  display: flex; gap: 12px;
+  padding: 15px 16px 15px 15px;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow-sm);
+  transition: transform .18s ease, box-shadow .18s ease;
+}
+.bless:hover { transform: translateY(-2px); box-shadow: var(--shadow); }
+.bless.is-anon { background: linear-gradient(180deg, var(--surface), var(--surface-2)); }
+
+.bless__ava {
+  flex: 0 0 38px; width: 38px; height: 38px;
+  display: grid; place-items: center;
+  border-radius: 50%;
+  background: var(--accent-soft);
+  color: var(--accent-ink);
+  font-size: 16px; font-weight: 800;
+}
+.bless.is-anon .bless__ava { font-size: 18px; }
+
+.bless__body { flex: 1; min-width: 0; }
+.bless__top {
+  display: flex; align-items: baseline; gap: 8px; flex-wrap: wrap;
+  margin-bottom: 5px;
+}
+.bless__name { font-size: 13.5px; font-weight: 700; color: var(--text); }
+.bless.is-anon .bless__name { color: var(--muted); font-weight: 600; }
+.bless__time { font-size: 11.5px; color: var(--muted); }
+.bless__text {
+  font-size: 14px; line-height: 1.85;
+  color: var(--text);
+  word-break: break-word;
+  white-space: pre-wrap;
+}
+.bless__del {
+  position: absolute; right: 10px; bottom: 8px;
+  border: 0; background: transparent;
+  font-size: 11.5px; color: var(--muted);
+  cursor: pointer; opacity: 0;
+  transition: opacity .15s ease, color .15s ease;
+}
+.bless:hover .bless__del { opacity: 1; }
+.bless__del:hover { color: var(--danger); }
+
+@media (max-width: 760px) {
+  .bless-hero { padding: 16px 16px; gap: 12px; }
+  .bless-hero__ico { font-size: 32px; }
+  .bless-wall { grid-template-columns: 1fr; }
+  .bless-row { gap: 10px; }
+  .bless-anon { padding-bottom: 0; }
+  .bless__del { opacity: 1; }
 }

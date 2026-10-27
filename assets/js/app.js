@@ -25,6 +25,7 @@ window.App = (function () {
     events: [],
     pokes: [],
     trips: [],          // 旅行打卡记录
+    blessings: [],      // 访客的祝福留言
     aiConfig: null,     // AI 分身设置（人设、模型、限额）
     aiMemories: [],     // 记忆清单
     route: 'home',
@@ -41,6 +42,7 @@ window.App = (function () {
     { id: 'map',      hash: '#/map',      label: '旅行地图', icon: '🗺️', view: 'map' },
     { id: 'ai',       hash: '#/ai',       label: 'AI 分身', icon: '💬', view: 'ai' },
     { id: 'wishes',   hash: '#/wishes',   label: '心愿单', icon: '🌟', view: 'wishes' },
+    { id: 'bless',    hash: '#/bless',    label: '祝福墙', icon: '🎁', view: 'bless' },
     { id: 'settings', hash: '#/settings', label: '设置',   icon: '⚙️', view: 'settings' }
   ];
   const LOGIN_ROUTE = { id: 'login', hash: '#/login', label: '登录', icon: '🔑', view: 'login' };
@@ -252,13 +254,14 @@ window.App = (function () {
   async function loadData() {
     if (state.locked) {
       state.photos = []; state.diary = []; state.notes = []; state.wishes = []; state.events = []; state.pokes = [];
-      state.trips = []; state.aiConfig = null; state.aiMemories = [];
+      state.trips = []; state.aiConfig = null; state.aiMemories = []; state.blessings = [];
       return;
     }
     const safe = (p) => p.catch((e) => { console.warn(e); return []; });
-    const [photos, diary, notes, wishes, events, pokes, trips] = await Promise.all([
+    const [photos, diary, notes, wishes, events, pokes, trips, blessings] = await Promise.all([
       safe(DB.photos.list()), safe(DB.diary.list()), safe(DB.notes.list()),
-      safe(DB.wishes.list()), safe(DB.events.list()), safe(DB.pokes.list()), safe(DB.trips.list())
+      safe(DB.wishes.list()), safe(DB.events.list()), safe(DB.pokes.list()), safe(DB.trips.list()),
+      safe(DB.blessings.list())
     ]);
     state.photos = photos || [];
     state.diary = diary || [];
@@ -267,6 +270,7 @@ window.App = (function () {
     state.events = events || [];
     state.pokes = pokes || [];
     state.trips = trips || [];
+    state.blessings = blessings || [];
     try { state.aiConfig = await DB.ai.config.get(); } catch (e) { console.warn(e); state.aiConfig = null; }
     state.aiMemories = await DB.ai.memories.list().catch((e) => { console.warn(e); return []; });
   }
