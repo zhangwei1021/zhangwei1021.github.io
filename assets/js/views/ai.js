@@ -41,14 +41,22 @@ window.Views.ai = (function () {
     return 'calm';
   }
 
-  /* 分身形象：默认用百炼「人像风格重绘」生成的卡通形象（assets/img/…）
-     settings.buddyImage 可以是：图片地址（本站图片或上传后的地址）/ 'svg'（手绘小人）/ 空（用默认） */
-  const BUDDY_DEFAULT = 'assets/img/buddy-him.jpg';
+  /* 分身形象：一张图片（默认用照他照片生成的那张 Q 版小人），头像用同一张图的脸部特写 */
+  const BUDDY_DEFAULT = 'assets/img/buddy-pixar.jpg';
+  const BUDDY_FACE = 'assets/img/buddy-pixar-face.jpg';
 
   function buddyPic(ctx) {
     const v = s(ctx).buddyImage;
     if (v === 'svg') return '';
-    return v || BUDDY_DEFAULT;
+    if (v) return v;
+    return BUDDY_DEFAULT;
+  }
+
+  /* 需要一张静态图时（聊天气泡头像、封面…）：默认形象就用脸部特写，小圆头像里也看得清 */
+  function buddyImage(ctx) {
+    const p = buddyPic(ctx);
+    if (!p) return '';
+    return p === BUDDY_DEFAULT ? BUDDY_FACE : p;
   }
 
   function buddySvg() {
@@ -107,12 +115,13 @@ window.Views.ai = (function () {
 
   function buddyHtml(name, pic) {
     const p = pic === undefined ? BUDDY_DEFAULT : pic;
+    const inner = p ? `<img class="buddy__pic" src="${esc(p)}" alt="${esc(name)} 的形象">` : '';
     return `
       <div class="card buddy-card">
-        <div class="buddy is-idle mood-calm no-pic" id="ai-buddy">
+        <div class="buddy is-idle mood-calm ${p ? 'has-pic' : 'no-pic'}" id="ai-buddy">
           <div class="buddy__stage">
-            <div class="love-avatar" data-love-avatar="ai" aria-label="互动式 3D 卡通分身"></div>
-            ${buddySvg()}
+            ${inner}
+            ${p ? '' : buddySvg()}
             <span class="buddy__hearts" aria-hidden="true"><i>💗</i><i>💗</i></span>
             <div class="buddy__think" aria-hidden="true"><i></i><i></i><i></i></div>
           </div>
@@ -185,7 +194,7 @@ window.Views.ai = (function () {
     const myName = (ctx.me && ctx.me.name && ctx.me.name !== 'local') ? ctx.me.name : '我';
     const who = mine ? myName : oi.name;
     // 分身说的话在左边，头像就用他的卡通形象（没配图时退回昵称头像）
-    const avatar = mine ? ((ctx.me && ctx.me.avatar) || '') : (buddyPic(ctx) || oi.avatar);
+    const avatar = mine ? ((ctx.me && ctx.me.avatar) || '') : (buddyImage(ctx) || oi.avatar);
     const isGreet = /^greeting/.test(String(m.kind || ''));
     return `
       <div class="chat__row ${mine ? 'is-me' : 'is-ai'}">
@@ -334,12 +343,23 @@ window.Views.ai = (function () {
   }
 
   /* 卡通分身：呼吸、眨眼、歪头都在 CSS 里；这里只管「在想 / 在说 / 什么心情」 */
+  /** 说完一句话，小人原地蹦一下（照片版才有） */
+  function hopBuddy() {
+    const img = buddyEl && buddyEl.querySelector('.buddy__pic');
+    if (!img) return;
+    img.classList.remove('is-hop');
+    void img.offsetWidth;                       // 强制重排，动画才会重新播
+    img.classList.add('is-hop');
+    setTimeout(() => img.classList.remove('is-hop'), 760);
+  }
+
   function paintBuddy(root, ctx) {
     if (!buddyEl || !document.body.contains(buddyEl)) buddyEl = (root || document).querySelector('#ai-buddy');
     const el = buddyEl;
     if (!el) return;
     const last = lastAiMsg();
     const now = Date.now();
+    const wasThinking = !!S.sending;
     const talking = !S.sending && S.talkingUntil > now;
     el.classList.toggle('is-thinking', !!S.sending);
     el.classList.toggle('is-talking', talking);
@@ -347,6 +367,9 @@ window.Views.ai = (function () {
 
     const mood = S.sending ? 'calm' : moodOf(last ? last.content : '');
     ['calm', 'love', 'happy', 'shy', 'soft'].forEach((m) => el.classList.toggle('mood-' + m, m === mood));
+
+    // 从「正在想」变成「说话」的那一下：蹦一下，像真的在回应你
+    if (wasThinking && !S.sending && talking) hopBuddy();
 
     const statusEl = el.querySelector('#buddy-status');
     if (statusEl) statusEl.textContent = S.sending ? '正在想…' : '在线';
@@ -469,7 +492,6 @@ window.Views.ai = (function () {
     inputEl = root.querySelector('#chat-input');
     formEl = root.querySelector('#chat-form');
     buddyEl = root.querySelector('#ai-buddy');
-    const disposeAvatar = window.LoveAvatar && window.LoveAvatar.mountAll(root);
 
     paint(root, ctx);
 
@@ -477,6 +499,11 @@ window.Views.ai = (function () {
     root.addEventListener('error', (e) => {
       const img = e.target;
       if (!img || img.tagName !== 'IMG' || !img.parentNode) return;
+      if (img.classList && img.classList.contains('buddy__pic')) {
+        const b = img.closest('#ai-buddy');          // 卡通形象没加载出来 → 退回手绘小人
+        if (b) b.classList.add('pic-fail');
+        return;
+      }
       const box = img.parentNode;
       if (!box.classList || !box.classList.contains('chat__ava')) return;
       box.classList.add('chat__ava--txt');
@@ -535,9 +562,8 @@ window.Views.ai = (function () {
 
     return () => {
       if (talkTimer) { clearTimeout(talkTimer); talkTimer = null; }
-      if (typeof disposeAvatar === 'function') disposeAvatar();
     };
   }
 
-  return { render, mount, title: 'AI 分身', buddyHtml, buddySvg, moodOf, buddyPic };
+  return { render, mount, title: 'AI 分身', buddyHtml, buddySvg, moodOf, buddyPic, buddyImage };
 })();

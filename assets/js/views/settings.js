@@ -292,7 +292,7 @@ window.Views.settings = (function () {
     const mems = (ctx.aiMemories || []).slice()
       .sort((a, b) => String(b.created_at || '').localeCompare(String(a.created_at || '')));
     const kinds = ['第一次', '称呼', '习惯', '纪念日', '家人朋友', '其他'];
-    const curBuddy = (ctx.settings && ctx.settings.buddyImage) || 'assets/img/buddy-him.jpg';
+    const curBuddy = (ctx.settings && ctx.settings.buddyImage) || 'assets/img/buddy-pixar.jpg';
 
     return `
       <div class="card card--pad set-sec" style="margin-top:22px">
@@ -334,14 +334,16 @@ window.Views.settings = (function () {
           <div class="field">
             <span class="field__label">分身形象（聊天页顶上那个小人）</span>
             <div class="buddy-picks">
-              <button type="button" class="buddy-pick ${curBuddy === 'assets/img/buddy-him.jpg' ? 'is-active' : ''}" data-buddy="assets/img/buddy-him.jpg" title="3D 童话">
-                <img src="assets/img/buddy-him.jpg" alt="3D 童话"><span class="buddy-pick__name">3D 童话</span></button>
+              <button type="button" class="buddy-pick ${curBuddy === 'assets/img/buddy-pixar.jpg' ? 'is-active' : ''}" data-buddy="assets/img/buddy-pixar.jpg" title="Q 版小人（你现在用的这张）">
+                <img src="assets/img/buddy-pixar.jpg" alt="Q 版小人"><span class="buddy-pick__name">Q 版小人</span></button>
+              <button type="button" class="buddy-pick ${curBuddy === 'assets/img/buddy-him.jpg' ? 'is-active' : ''}" data-buddy="assets/img/buddy-him.jpg" title="用照片做的卡通形象">
+                <img src="assets/img/buddy-him.jpg" alt="照片版"><span class="buddy-pick__name">照片版</span></button>
+              <button type="button" class="buddy-pick ${curBuddy === 'assets/img/buddy-him-old.jpg' ? 'is-active' : ''}" data-buddy="assets/img/buddy-him-old.jpg" title="之前那张 3D 童话">
+                <img src="assets/img/buddy-him-old.jpg" alt="3D 童话"><span class="buddy-pick__name">3D 童话</span></button>
               <button type="button" class="buddy-pick ${curBuddy === 'assets/img/buddy-him-2d.jpg' ? 'is-active' : ''}" data-buddy="assets/img/buddy-him-2d.jpg" title="二次元">
                 <img src="assets/img/buddy-him-2d.jpg" alt="二次元"><span class="buddy-pick__name">二次元</span></button>
               <button type="button" class="buddy-pick ${curBuddy === 'assets/img/buddy-him-soft.jpg' ? 'is-active' : ''}" data-buddy="assets/img/buddy-him-soft.jpg" title="小清新">
                 <img src="assets/img/buddy-him-soft.jpg" alt="小清新"><span class="buddy-pick__name">小清新</span></button>
-              <button type="button" class="buddy-pick ${curBuddy === 'svg' ? 'is-active' : ''}" data-buddy="svg" title="手绘小人">
-                <span class="buddy-pick__svg">🧑‍🎨</span><span class="buddy-pick__name">手绘小人</span></button>
               <button type="button" class="buddy-pick" data-buddy-up title="用你自己的图片">
                 <span class="buddy-pick__svg">＋</span><span class="buddy-pick__name">自己的图</span></button>
             </div>

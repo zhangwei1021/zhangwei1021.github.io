@@ -201,14 +201,7 @@ p { margin: 0 0 .6em; }
   border: 3px solid rgba(255,255,255,.85); box-shadow: 0 14px 30px rgba(160,90,120,.22);
   background: var(--surface-2); animation: buddyBreathe 4.6s ease-in-out infinite;
 }
-.counter__buddy .hb__pic { width: 100%; height: 100%; object-fit: cover; display: block; }
-.love-avatar { width: 100%; height: 100%; min-height: 150px; position: relative; touch-action: pan-y; cursor: pointer; }
-.love-avatar canvas { width: 100%; height: 100%; display: block; }
-.counter__buddy .love-avatar { min-height: 0; }
-.counter__buddy .hb { overflow: visible; background: radial-gradient(ellipse at 50% 45%, rgba(255,255,255,.92), rgba(255,239,233,.36) 72%, transparent 73%); }
-.buddy__stage .love-avatar { width: 158px; height: 206px; min-height: 0; margin: -12px auto -4px; }
-.buddy__stage .love-avatar svg { display: none; }
-.buddy__stage:has(.love-avatar.is-3d) > .buddy__svg { display: none; }
+.counter__buddy .hb__pic { width: 100%; height: 100%; object-fit: contain; background: #fff; display: block; }
 .counter__buddy .hb svg { width: 100%; height: 100%; display: block; }
 .counter__buddy .hb__tail {
   position: absolute; left: -6px; top: 50%; width: 14px; height: 14px; margin-top: -7px; z-index: 0;
@@ -224,7 +217,6 @@ p { margin: 0 0 .6em; }
   .counter__flex { flex-direction: column; gap: 12px; }
   .counter__buddy { width: 96px; }
   .counter__buddy .hb { width: 96px; height: 96px; border-radius: 20px; }
-  .counter__buddy .love-avatar { width: 90px; height: 90px; }
   .counter__buddy .hb__tail {
     left: 50%; top: auto; bottom: -8px; margin: 0 0 0 -8px;
     border: 0; border-right: 3px solid rgba(255,255,255,.85); border-bottom: 3px solid rgba(255,255,255,.85);
@@ -994,6 +986,11 @@ button.avatar-pick { border: 0; background: transparent; padding: 0; cursor: poi
 .buddy.pic-fail .buddy__pic { display: none; }
 .buddy.pic-fail .buddy__svg { display: block; }
 
+/* ---- 形象图稍微放大一点，白底就直接融进卡片 ---- */
+.buddy.has-pic .buddy__stage { width: 188px; }
+.buddy__pic { object-fit: contain; background: #fff; }
+@media (max-width: 560px) { .buddy.has-pic .buddy__stage { width: 164px; } }
+
 .buddy__hearts { position: absolute; right: -4px; top: -12px; display: none; width: 42px; height: 42px; }
 .buddy__hearts i { position: absolute; left: 0; top: 6px; font-style: normal; font-size: 17px; opacity: 0; }
 .buddy__hearts i:nth-child(2) { left: 15px; top: 0; font-size: 12px; }
@@ -1006,6 +1003,38 @@ button.avatar-pick { border: 0; background: transparent; padding: 0; cursor: poi
 
 .buddy.has-pic.is-talking .buddy__pic { animation: buddyPicTalk .44s ease-in-out infinite alternate; }
 .buddy.has-pic.is-thinking .buddy__pic { animation: buddyPicThink 1.7s ease-in-out infinite; }
+
+/* ---- 照片版分身的「小动作」：平时轻轻晃、说话时点头+光圈、说完蹦一下 ---- */
+.buddy.has-pic .buddy__stage { animation: buddySway 7.6s ease-in-out infinite; }
+.buddy.has-pic .buddy__stage::after {
+  content: ''; position: absolute; inset: -8px; border-radius: 27px;
+  border: 2px solid var(--accent); opacity: 0; pointer-events: none;
+}
+.buddy.has-pic.is-talking .buddy__stage::after { animation: buddyRing 1.7s ease-out infinite; }
+.buddy__pic.is-hop { animation: buddyHop .66s cubic-bezier(.34, 1.56, .64, 1) 1; }
+
+@keyframes buddySway {
+  0%, 100% { transform: rotate(-.9deg) translateY(0); }
+  50% { transform: rotate(.9deg) translateY(-2.5px); }
+}
+@keyframes buddyRing {
+  0% { opacity: .5; transform: scale(.97); }
+  70% { opacity: 0; transform: scale(1.07); }
+  100% { opacity: 0; transform: scale(1.07); }
+}
+@keyframes buddyHop {
+  0% { transform: translateY(0) scale(1); }
+  34% { transform: translateY(-9px) scale(1.035); }
+  62% { transform: translateY(0) scale(.992); }
+  80% { transform: translateY(-3px) scale(1.012); }
+  100% { transform: translateY(0) scale(1); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .buddy__stage, .buddy__pic, .buddy__hearts i, .counter__buddy .hb {
+    animation: none !important;
+  }
+}
 
 @keyframes buddyPicTalk {
   from { transform: scale(1) rotate(-1.3deg); }
@@ -1039,7 +1068,6 @@ button.avatar-pick { border: 0; background: transparent; padding: 0; cursor: poi
   .buddy { flex-direction: column; align-items: center; gap: 10px; }
   .buddy__stage { width: 124px; }
   .buddy.has-pic .buddy__stage { width: 144px; }
-  .buddy__stage .love-avatar { width: 144px; height: 188px; }
   .buddy__side { width: 100%; padding-bottom: 0; }
   .buddy__bubble::before { left: 50%; bottom: auto; top: -5px; margin-left: -6px; }
 }

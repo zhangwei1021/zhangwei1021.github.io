@@ -45,7 +45,10 @@ window.Views.home = (function () {
   function counterBuddy(ctx) {
     const ai = window.Views && window.Views.ai;
     if (!ai || !ai.buddyPic) return '';
-    const inner = `<div class="love-avatar" data-love-avatar="home" aria-label="互动式 3D 卡通形象">${ai.buddySvg ? ai.buddySvg() : ''}</div>`;
+    const pic = ai.buddyPic(ctx);
+    const inner = pic
+      ? `<img src="${esc(pic)}" alt="${esc((ctx.me && ctx.me.name) || '')}" class="hb__pic">`
+      : (ai.buddySvg ? ai.buddySvg() : '');
     if (!inner) return '';
     const st = ctx.settings || {};
     const name = st.nicknameA || '我';
@@ -385,9 +388,11 @@ window.Views.home = (function () {
 
     // 计时器左边的小人：图挂了就整块藏起来，别留一个破图标
     const hb = root.querySelector('#home-buddy');
-    const disposeAvatar = hb && window.LoveAvatar ? window.LoveAvatar.mountAll(hb) : null;
     if (hb) {
-      hb.setAttribute('aria-label', '互动式 3D 卡通形象');
+      const pic = hb.querySelector('.hb__pic');
+      if (pic) pic.addEventListener('error', () => { hb.style.display = 'none'; });
+      hb.addEventListener('click', () => { location.hash = '#/ai'; });
+      hb.style.cursor = 'pointer';
     }
 
     root.addEventListener('click', (e) => {
@@ -407,7 +412,9 @@ window.Views.home = (function () {
       if (act === 'toggle-ms') { ctx.showAllMs = !ctx.showAllMs; window.App.render(); }
     });
 
-    return () => { clearInterval(timer); if (typeof disposeAvatar === 'function') disposeAvatar(); };
+    return () => {
+      clearInterval(timer);
+    };
   }
 
   /* ---------------- 戳一戳的动作 ---------------- */
