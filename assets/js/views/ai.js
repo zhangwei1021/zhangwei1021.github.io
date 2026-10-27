@@ -243,6 +243,22 @@ window.Views.ai = (function () {
     if (!ctx.canEdit) {
       return U.lockCard('🔒', 'AI 分身只有你们两个人能打开', '登录之后就能和 TA 的分身说说话啦');
     }
+    /* 登录了但还没选「我是哪一位」：先问清楚，否则分不清谁该看见什么 */
+    if (!ctx.me || !ctx.me.key) {
+      return `
+      <section class="section">
+        <div class="section__head"><h2 class="section__title">💬 AI 分身</h2></div>
+        <div class="card card--pad" style="text-align:center">
+          <div class="empty__icon">🙋</div>
+          <div class="empty__title">先告诉网站你是哪一位</div>
+          <div class="empty__desc">这个分身代表 ${esc(ownerInfo(ctx).name)}。选对他，你才会看到「她跟分身聊了什么」（只读）；选她，才能自己聊。</div>
+          <div class="filters" style="justify-content:center;margin-top:14px">
+            <button class="chip" data-ident="A" data-name="${esc(ownerInfo(ctx).name)}">🙂 我是 ${esc(ownerInfo(ctx).name)}（他）</button>
+            <button class="chip" data-ident="B" data-name="${esc(ownerInfo(ctx).herName)}">🙂 我是 ${esc(ownerInfo(ctx).herName)}（她）</button>
+          </div>
+        </div>
+      </section>`;
+    }
     if (!DB.isCloud()) {
       return `
       <section class="section">
@@ -281,6 +297,7 @@ window.Views.ai = (function () {
           <div class="section__actions">
             <button class="btn btn--ghost btn--sm" data-ai="reload">🔄 刷新</button>
             <button class="btn btn--ghost btn--sm" data-ai="settings">⚙️ 改人设和记忆</button>
+            ${S.msgs.length ? '<button class="btn btn--ghost btn--sm" data-ai="clear">🧹 清空对话</button>' : ''}
           </div>
         </div>
 
@@ -550,6 +567,7 @@ window.Views.ai = (function () {
               S.remaining = null;
               U.toast('已经清空了', 'success');
               paint(root, ctx);
+              if (isOwner(ctx)) window.App.refresh();
             } catch (err) { U.toast(err.message, 'error'); }
           }
           return;

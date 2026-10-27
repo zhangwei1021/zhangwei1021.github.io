@@ -122,10 +122,23 @@ p { margin: 0 0 .6em; }
 .nav__link {
   padding: 7px 13px; border-radius: 99px; font-size: 14.5px; color: var(--muted);
   white-space: nowrap; cursor: pointer; border: 0; background: transparent; transition: .2s;
+  flex: 0 0 auto;
 }
 .nav__link:hover { color: var(--text); background: var(--surface-3); }
 .nav__link.is-active { color: #fff; background: var(--accent); box-shadow: var(--shadow-sm); }
 .nav__ico { margin-right: 4px; }
+/* 窄一点的屏幕上：先收图标，再收内边距，保证「设置」这一类永远放得下 */
+@media (max-width: 1320px) { .nav__ico { display: none; } }
+@media (max-width: 1140px) {
+  .nav { gap: 0; }
+  .nav__link { padding: 7px 9px; font-size: 13.5px; }
+  .brand__name { max-width: 26vw; }
+}
+@media (max-width: 980px) {
+  .topbar__inner { flex-wrap: wrap; height: auto; min-height: 62px; padding: 8px 0 6px; gap: 8px; }
+  .nav { order: 3; width: 100%; margin-left: 0; flex-wrap: wrap; overflow: visible; }
+  .brand__name { max-width: 42vw; }
+}
 .topbar__right { display: flex; align-items: center; gap: 8px; flex: none; }
 .who { display: flex; align-items: center; gap: 8px; padding: 4px 12px 4px 4px; border-radius: 99px; background: var(--surface-3); cursor: pointer; border: 1px solid var(--line); }
 .who__avatar { width: 28px; height: 28px; border-radius: 50%; object-fit: cover; background: var(--accent-soft); display: grid; place-items: center; font-size: 13px; }

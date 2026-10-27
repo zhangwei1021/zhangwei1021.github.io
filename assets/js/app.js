@@ -123,14 +123,6 @@ window.App = (function () {
         });
       }
       root.addEventListener('click', async (e) => {
-        const b = e.target.closest('[data-ident]');
-        if (b) {
-          DB.identity.set(b.getAttribute('data-ident'));
-          ctx.needIdentity = false;
-          U.toast('以后就以「' + b.getAttribute('data-name') + '」的身份出现啦', 'success');
-          await refresh();
-          return;
-        }
         if (e.target.closest('[data-pick-identity]')) { ctx.needIdentity = true; render(); return; }
         if (e.target.closest('[data-logout]')) {
           if (!(await U.confirmBox('退出登录？', { title: '退出' }))) return;
@@ -164,6 +156,7 @@ window.App = (function () {
           </button>
         </div>
         <div class="login__tip">名字和头像在「设置 → 我们的信息」里可以改</div>
+        <div style="margin-top:14px;font-size:13px"><a href="javascript:;" data-skip-ident style="color:var(--muted)">先随便看看 →</a></div>
       </div>
     </div>`;
   }
@@ -192,7 +185,7 @@ window.App = (function () {
             ? '<a class="btn btn--primary btn--sm" href="#/login">登录</a>'
             : `<div class="who" data-who>
                  <span class="who__avatar">${me.avatar ? `<img src="${esc(me.avatar)}" alt="" style="width:100%;height:100%;border-radius:50%;object-fit:cover">` : '🙂'}</span>
-                 <span class="who__name">${esc(me.name || '访客')}</span>
+                 <span class="who__name">${esc(me.key ? (me.name || '我') : (state.mode === 'local' ? '本机' : '我'))}</span>
                </div>
                ${u ? '<button class="btn btn--ghost btn--sm" data-logout-quick>退出</button>'
                    : '<a class="btn btn--ghost btn--sm" href="#/login">登录</a>'}`}
@@ -328,10 +321,26 @@ window.App = (function () {
   /* --------------------------------------------------------------- 渲染 */
   let viewCleanup = null;   // 上一个视图返回的清理函数（定时器、监听等）
 
+  /* 登录了但还没选「我是哪一位」时，先把这一页挡出来 —— 否则谁是谁分不清（昵称会变成手机号） */
+  function needIdentity() {
+    return !!(DB.isCloud() && state.user && !DB.identity.get() && !state._skipIdent);
+  }
+
+  const IDENT_VIEW = {
+    id: 'ident',
+    title: '你是哪一位',
+    render(ctx) { return identityHtml(ctx.settings || ctx.s); },
+    mount(root, ctx) {
+      root.addEventListener('click', (e) => {
+        if (e.target.closest('[data-skip-ident]')) { state._skipIdent = true; render(); }
+      });
+    }
+  };
+
   function render() {
-    const r = state.locked ? LOGIN_ROUTE : routeInfo();
+    const r = state.locked ? LOGIN_ROUTE : (needIdentity() ? IDENT_VIEW : routeInfo());
     state.route = r.id;
-    const view = Views[r.view] || Views.home;
+    const view = (r === IDENT_VIEW) ? IDENT_VIEW : (Views[r.view] || Views.home);
 
     // 上一页的定时器/监听器先收尾，避免每次渲染叠一堆
     if (typeof viewCleanup === 'function') { try { viewCleanup(); } catch (e) { /* 忽略 */ } }
@@ -559,6 +568,17 @@ window.App = (function () {
   function bindGlobal() {
     // 顶栏 / 全局
     document.addEventListener('click', async (e) => {
+      /* 选「我是哪一位」（登录后第一次、或设置页里改） */
+      const idb = e.target.closest('[data-ident]');
+      if (idb) {
+        const k = idb.getAttribute('data-ident');
+        DB.identity.set(k);
+        state._skipIdent = false;
+        U.toast('以后就以「' + (idb.getAttribute('data-name') || k) + '」的身份出现啦', 'success');
+        await refresh();
+        return;
+      }
+
       /* 大图查看器 */
       if (e.target.closest('[data-zoom-close]')) return closeZoom();
       const st = e.target.closest('[data-zoom-step]');

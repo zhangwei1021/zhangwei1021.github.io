@@ -68,6 +68,7 @@ window.Views.settings = (function () {
       (ctx.photos || []).map((p) => ({ value: p.id, label: (p.caption || '照片') + ' · ' + U.fmtDate(p.taken_at, { short: true }) }))
     );
     const cover = (ctx.photos || []).find((p) => p.id === s.coverPhotoId);
+    const me = ctx.me || {};
 
     if (!ctx.canEdit) {
       return `<section class="section"><div class="empty card card--pad">
@@ -127,6 +128,13 @@ window.Views.settings = (function () {
           </div>
 
           <label class="field" style="max-width:420px">
+              <span class="field__label">正在用哪台电脑/手机登录的是谁</span>
+              <div class="filters" style="margin:0">
+                <button type="button" class="chip ${me && me.key === 'A' ? 'is-active' : ''}" data-ident="A" data-name="${esc(s.nicknameA || 'A')}">🙂 ${esc(s.nicknameA || 'A')}（我）</button>
+                <button type="button" class="chip ${me && me.key === 'B' ? 'is-active' : ''}" data-ident="B" data-name="${esc(s.nicknameB || 'B')}">🙂 ${esc(s.nicknameB || 'B')}（TA）</button>
+              </div>
+              <span class="field__hint">选错了会让「谁写的日记」「AI 分身给谁聊」都错位，点一下就能改</span>
+            </label>
             <span class="field__label">谁能看到这个网站</span>
             <select class="input" name="visibility">
               <option value="public" ${s.visibility === 'public' ? 'selected' : ''}>任何人都能浏览（推荐）</option>
