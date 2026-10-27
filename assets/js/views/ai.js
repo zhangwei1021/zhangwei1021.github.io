@@ -109,9 +109,9 @@ window.Views.ai = (function () {
     const p = pic === undefined ? BUDDY_DEFAULT : pic;
     return `
       <div class="card buddy-card">
-        <div class="buddy is-idle mood-calm ${p ? 'has-pic' : 'no-pic'}" id="ai-buddy">
+        <div class="buddy is-idle mood-calm no-pic" id="ai-buddy">
           <div class="buddy__stage">
-            ${p ? `<img class="buddy__pic" src="${esc(p)}" alt="${esc(name)} 的形象">` : ''}
+            <div class="love-avatar" data-love-avatar="ai" aria-label="互动式 3D 卡通分身"></div>
             ${buddySvg()}
             <span class="buddy__hearts" aria-hidden="true"><i>💗</i><i>💗</i></span>
             <div class="buddy__think" aria-hidden="true"><i></i><i></i><i></i></div>
@@ -469,6 +469,7 @@ window.Views.ai = (function () {
     inputEl = root.querySelector('#chat-input');
     formEl = root.querySelector('#chat-form');
     buddyEl = root.querySelector('#ai-buddy');
+    const disposeAvatar = window.LoveAvatar && window.LoveAvatar.mountAll(root);
 
     paint(root, ctx);
 
@@ -476,11 +477,6 @@ window.Views.ai = (function () {
     root.addEventListener('error', (e) => {
       const img = e.target;
       if (!img || img.tagName !== 'IMG' || !img.parentNode) return;
-      if (img.classList && img.classList.contains('buddy__pic')) {
-        const b = img.closest('#ai-buddy');          // 卡通形象没加载出来 → 退回手绘小人
-        if (b) b.classList.add('pic-fail');
-        return;
-      }
       const box = img.parentNode;
       if (!box.classList || !box.classList.contains('chat__ava')) return;
       box.classList.add('chat__ava--txt');
@@ -539,6 +535,7 @@ window.Views.ai = (function () {
 
     return () => {
       if (talkTimer) { clearTimeout(talkTimer); talkTimer = null; }
+      if (typeof disposeAvatar === 'function') disposeAvatar();
     };
   }
 

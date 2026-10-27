@@ -202,6 +202,13 @@ p { margin: 0 0 .6em; }
   background: var(--surface-2); animation: buddyBreathe 4.6s ease-in-out infinite;
 }
 .counter__buddy .hb__pic { width: 100%; height: 100%; object-fit: cover; display: block; }
+.love-avatar { width: 100%; height: 100%; min-height: 150px; position: relative; touch-action: pan-y; cursor: pointer; }
+.love-avatar canvas { width: 100%; height: 100%; display: block; }
+.counter__buddy .love-avatar { min-height: 0; }
+.counter__buddy .hb { overflow: visible; background: radial-gradient(ellipse at 50% 45%, rgba(255,255,255,.92), rgba(255,239,233,.36) 72%, transparent 73%); }
+.buddy__stage .love-avatar { width: 158px; height: 206px; min-height: 0; margin: -12px auto -4px; }
+.buddy__stage .love-avatar svg { display: none; }
+.buddy__stage:has(.love-avatar.is-3d) > .buddy__svg { display: none; }
 .counter__buddy .hb svg { width: 100%; height: 100%; display: block; }
 .counter__buddy .hb__tail {
   position: absolute; left: -6px; top: 50%; width: 14px; height: 14px; margin-top: -7px; z-index: 0;
@@ -217,6 +224,7 @@ p { margin: 0 0 .6em; }
   .counter__flex { flex-direction: column; gap: 12px; }
   .counter__buddy { width: 96px; }
   .counter__buddy .hb { width: 96px; height: 96px; border-radius: 20px; }
+  .counter__buddy .love-avatar { width: 90px; height: 90px; }
   .counter__buddy .hb__tail {
     left: 50%; top: auto; bottom: -8px; margin: 0 0 0 -8px;
     border: 0; border-right: 3px solid rgba(255,255,255,.85); border-bottom: 3px solid rgba(255,255,255,.85);
@@ -1031,6 +1039,7 @@ button.avatar-pick { border: 0; background: transparent; padding: 0; cursor: poi
   .buddy { flex-direction: column; align-items: center; gap: 10px; }
   .buddy__stage { width: 124px; }
   .buddy.has-pic .buddy__stage { width: 144px; }
+  .buddy__stage .love-avatar { width: 144px; height: 188px; }
   .buddy__side { width: 100%; padding-bottom: 0; }
   .buddy__bubble::before { left: 50%; bottom: auto; top: -5px; margin-left: -6px; }
 }
