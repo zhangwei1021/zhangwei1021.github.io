@@ -24,6 +24,7 @@ window.App = (function () {
     wishes: [],
     events: [],
     pokes: [],
+    trips: [],          // 旅行打卡记录
     aiConfig: null,     // AI 分身设置（人设、模型、限额）
     aiMemories: [],     // 记忆清单
     route: 'home',
@@ -37,6 +38,7 @@ window.App = (function () {
     { id: 'gallery',  hash: '#/gallery',  label: '相册',   icon: '📷', view: 'gallery' },
     { id: 'diary',    hash: '#/diary',    label: '日记',   icon: '✍️', view: 'diary' },
     { id: 'notes',    hash: '#/notes',    label: '悄悄话', icon: '💌', view: 'notes' },
+    { id: 'map',      hash: '#/map',      label: '旅行地图', icon: '🗺️', view: 'map' },
     { id: 'ai',       hash: '#/ai',       label: 'AI 分身', icon: '💬', view: 'ai' },
     { id: 'wishes',   hash: '#/wishes',   label: '心愿单', icon: '🌟', view: 'wishes' },
     { id: 'settings', hash: '#/settings', label: '设置',   icon: '⚙️', view: 'settings' }
@@ -237,6 +239,7 @@ window.App = (function () {
       <figcaption class="ph__meta">
         ${p.caption ? `<div class="ph__cap">${esc(p.caption)}</div>` : ''}
         <div class="ph__date">${esc(U.fmtDate(p.taken_at))}${p.author ? ' · ' + esc(p.author) : ''}</div>
+        ${p.city ? `<div class="ph__tags"><span class="ph__tag">📍 ${esc(p.city)}</span></div>` : ''}
         ${(p.tags && p.tags.length) ? `<div class="ph__tags">${p.tags.map((t) => `<span class="ph__tag">${esc(t)}</span>`).join('')}</div>` : ''}
       </figcaption>
     </figure>`;
@@ -256,13 +259,13 @@ window.App = (function () {
   async function loadData() {
     if (state.locked) {
       state.photos = []; state.diary = []; state.notes = []; state.wishes = []; state.events = []; state.pokes = [];
-      state.aiConfig = null; state.aiMemories = [];
+      state.trips = []; state.aiConfig = null; state.aiMemories = [];
       return;
     }
     const safe = (p) => p.catch((e) => { console.warn(e); return []; });
-    const [photos, diary, notes, wishes, events, pokes] = await Promise.all([
+    const [photos, diary, notes, wishes, events, pokes, trips] = await Promise.all([
       safe(DB.photos.list()), safe(DB.diary.list()), safe(DB.notes.list()),
-      safe(DB.wishes.list()), safe(DB.events.list()), safe(DB.pokes.list())
+      safe(DB.wishes.list()), safe(DB.events.list()), safe(DB.pokes.list()), safe(DB.trips.list())
     ]);
     state.photos = photos || [];
     state.diary = diary || [];
@@ -270,6 +273,7 @@ window.App = (function () {
     state.wishes = wishes || [];
     state.events = events || [];
     state.pokes = pokes || [];
+    state.trips = trips || [];
     try { state.aiConfig = await DB.ai.config.get(); } catch (e) { console.warn(e); state.aiConfig = null; }
     state.aiMemories = await DB.ai.memories.list().catch((e) => { console.warn(e); return []; });
   }
@@ -356,45 +360,137 @@ window.App = (function () {
   }
 
   /* ------------------------------------------------------------ 背景音乐 */
-  let audio = null, playing = false, musicWarned = false;
+  let audio = null, playing = false, musicWarned = false, mi = 0;
+
+  const MUSIC_MODES = [
+    { id: 'loop',   ico: '🔁', name: '列表循环' },
+    { id: 'order',  ico: '➡️', name: '顺序播放' },
+    { id: 'random', ico: '🔀', name: '随机播放' },
+    { id: 'one',    ico: '🔂', name: '单曲循环' }
+  ];
+
+  function musicTracks() {
+    const s = state.settings || {};
+    const list = (s.playlist || []).filter((t) => t && t.url);
+    if (list.length) return list;
+    const m = s.music || {};
+    return m.url ? [m] : [];
+  }
+  function musicMode() {
+    const m = (state.settings && state.settings.music) || {};
+    const hit = MUSIC_MODES.filter((x) => x.id === m.mode)[0];
+    return hit ? hit.id : 'loop';
+  }
+  function musicModeInfo() {
+    return MUSIC_MODES.filter((x) => x.id === musicMode())[0] || MUSIC_MODES[0];
+  }
+
   function renderMusic() {
     const slot = document.getElementById('music-slot');
     if (!slot) return;
+    const tracks = musicTracks();
     const m = (state.settings && state.settings.music) || {};
-    if (!m.url) { slot.innerHTML = ''; return; }
+    if (!tracks.length) {
+      slot.innerHTML = '';
+      if (audio && playing) audio.pause();
+      return;
+    }
+    if (mi >= tracks.length) mi = 0;
+    const cur = tracks[mi] || {};
+    const mode = musicModeInfo();
+
     if (!audio) {
       audio = new Audio();
-      audio.loop = true;
       audio.preload = 'none';
       audio.addEventListener('play', () => { playing = true; paintMusic(); });
       audio.addEventListener('pause', () => { playing = false; paintMusic(); });
-      audio.addEventListener('ended', () => { playing = false; paintMusic(); });
+      audio.addEventListener('ended', onMusicEnd);
     }
-    if (audio.src !== m.url) { audio.src = m.url; audio.load(); }
+    audio.loop = (mode.id === 'one');
+    if (audio.getAttribute('data-src') !== cur.url) {
+      audio.src = cur.url;
+      audio.setAttribute('data-src', cur.url);
+      audio.load();
+    }
     audio.volume = typeof m.volume === 'number' ? m.volume : 0.6;
+
     slot.innerHTML = `
-      <div class="music ${playing ? 'is-playing' : ''}" id="music-btn" title="点一下播放 / 暂停">
-        <span class="music__disc">${m.cover ? `<img src="${esc(m.cover)}" alt="" style="width:100%;height:100%;border-radius:50%;object-fit:cover">` : '♪'}</span>
+      <div class="music ${playing ? 'is-playing' : ''}" id="music">
+        <button class="music__disc" id="music-btn" title="点一下播放 / 暂停">${cur.cover ? `<img src="${esc(cur.cover)}" alt="">` : '♪'}</button>
         <span class="music__info">
-          <span class="music__title">${esc(m.title || '我们的歌')}</span>
-          <span class="music__artist">${esc(playing ? (m.artist || '正在播放') : (m.artist || '点击播放'))}</span>
+          <span class="music__title" id="music-title">${esc(cur.title || '我们的歌')}</span>
+          <span class="music__artist" id="music-artist">${esc(playing ? (cur.artist || '正在播放') : (cur.artist || '点击播放'))}</span>
+        </span>
+        <span class="music__ctrl">
+          <button class="music__btn" id="music-prev" title="上一首">⏮</button>
+          <button class="music__btn ${playing ? 'is-on' : ''}" id="music-play" title="播放 / 暂停">${playing ? '⏸' : '▶'}</button>
+          <button class="music__btn" id="music-next" title="下一首">⏭</button>
+          <button class="music__btn music__mode" id="music-mode" title="播放方式：${mode.name}（点一下换一种）">${mode.ico}</button>
         </span>
         <input class="music__vol" type="range" min="0" max="1" step="0.05" value="${audio.volume}" title="音量">
+        <span class="music__count mono" title="第几首 / 共几首">${mi + 1}/${tracks.length}</span>
       </div>`;
-    const btn = slot.querySelector('#music-btn');
-    const vol = slot.querySelector('.music__vol');
-    if (btn) btn.addEventListener('click', (e) => { if (e.target === vol) return; toggleMusic(); });
-    if (vol) vol.addEventListener('input', () => { audio.volume = Number(vol.value); });
+
+    const hit = (sel) => slot.querySelector(sel);
+    if (hit('#music-btn')) hit('#music-btn').addEventListener('click', () => toggleMusic());
+    if (hit('#music-play')) hit('#music-play').addEventListener('click', () => toggleMusic());
+    if (hit('#music-prev')) hit('#music-prev').addEventListener('click', () => playAt(mi - 1));
+    if (hit('#music-next')) hit('#music-next').addEventListener('click', () => playAt(mi + 1));
+    if (hit('#music-mode')) hit('#music-mode').addEventListener('click', cycleMusicMode);
+    if (hit('.music__vol')) hit('.music__vol').addEventListener('input', (e) => { audio.volume = Number(e.target.value); });
+
     if (m.autoplay && !playing && !state._autoplayTried) { state._autoplayTried = true; toggleMusic(true); }
   }
+
   function paintMusic() {
-    const btn = document.getElementById('music-btn');
-    if (!btn) return;
-    btn.classList.toggle('is-playing', playing);
-    const m = (state.settings && state.settings.music) || {};
-    const ar = btn.querySelector('.music__artist');
-    if (ar) ar.textContent = playing ? (m.artist || '正在播放') : (m.artist || '点击播放');
+    const box = document.getElementById('music');
+    if (!box) return;
+    box.classList.toggle('is-playing', playing);
+    const tracks = musicTracks();
+    const cur = tracks[mi] || {};
+    const ar = document.getElementById('music-artist');
+    if (ar) ar.textContent = playing ? (cur.artist || '正在播放') : (cur.artist || '点击播放');
+    const pb = document.getElementById('music-play');
+    if (pb) { pb.textContent = playing ? '⏸' : '▶'; pb.classList.toggle('is-on', playing); }
   }
+
+  /** 换一首：本来在播就接着播，本来是暂停就只换歌 */
+  async function playAt(i) {
+    const tracks = musicTracks();
+    if (!tracks.length) return;
+    const wasPlaying = playing;
+    mi = ((i % tracks.length) + tracks.length) % tracks.length;
+    renderMusic();
+    if (wasPlaying) { try { await audio.play(); } catch (e) { /* 忽略 */ } }
+  }
+
+  function onMusicEnd() {
+    const tracks = musicTracks();
+    const mode = musicMode();
+    if (!tracks.length || mode === 'one') return;
+    if (mode === 'random' && tracks.length > 1) {
+      let n = mi;
+      while (n === mi) n = Math.floor(Math.random() * tracks.length);
+      playAt(n);
+      return;
+    }
+    if (mi + 1 < tracks.length) { playAt(mi + 1); return; }
+    if (mode === 'loop') { playAt(0); return; }
+    playing = false;                    // 顺序播放：到底就停
+    paintMusic();
+  }
+
+  function cycleMusicMode() {
+    const cur = musicMode();
+    const idx = MUSIC_MODES.map((x) => x.id).indexOf(cur);
+    const next = MUSIC_MODES[(idx + 1) % MUSIC_MODES.length];
+    const m = Object.assign({}, (state.settings && state.settings.music) || {}, { mode: next.id });
+    state.settings.music = m;
+    if (state.canEdit) { try { DB.settings.patch({ music: m }); } catch (e) { /* 忽略 */ } }
+    U.toast('播放方式：' + next.name, 'info');
+    renderMusic();
+  }
+
   async function toggleMusic(auto) {
     if (!audio) return;
     try {
@@ -507,13 +603,19 @@ window.App = (function () {
         const d = await U.formBox('编辑这张照片', [
           { name: 'caption', label: '描述', type: 'text', value: p.caption || '', placeholder: '例如：第一次一起看海' },
           { name: 'taken_at', label: '拍摄日期', type: 'date', value: p.taken_at || U.todayStr() },
+          { name: 'city', label: '在哪个城市拍的', type: 'text', value: p.city || '', placeholder: '例如：杭州', hint: '填了就会出现在「旅行地图」里' },
           { name: 'tags', label: '标签', type: 'text', value: (p.tags || []).join(', '), hint: '用逗号分隔' },
           { name: 'is_home', label: '首页展示', type: 'checkbox', checkLabel: '放进首页照片墙', value: !!p.is_home }
         ]);
         if (!d) return;
+        const city = String(d.city || '').trim();
+        const trips = state.trips || [];
+        const hit = trips.filter((r) => r.city && r.city === city)[0];
         try {
           await DB.photos.patch(p.id, {
             caption: d.caption, taken_at: d.taken_at,
+            city: city || null,
+            province: (hit && hit.province) || '',
             tags: String(d.tags || '').split(/[,，\s]+/).map((x) => x.trim()).filter(Boolean),
             is_home: !!d.is_home
           });

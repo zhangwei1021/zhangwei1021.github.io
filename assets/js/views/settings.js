@@ -16,10 +16,54 @@ window.Views.settings = (function () {
       </button>`).join('');
   }
 
+  /* ---------------- 播放列表（可以有好多首歌） ---------------- */
+  let PL = [];                       // 当前编辑中的列表（保存时写回 settings.playlist）
+
+  function playlistOf(s) {
+    const list = ((s && s.playlist) || []).filter((t) => t && t.url);
+    if (list.length) return list.map((t) => ({ url: t.url, title: t.title || '', artist: t.artist || '', cover: t.cover || '' }));
+    const m = (s && s.music) || {};
+    return m.url ? [{ url: m.url, title: m.title || '', artist: m.artist || '', cover: m.cover || '' }] : [];
+  }
+
+  function playlistHtml(pl) {
+    if (!pl.length) {
+      return '<div class="pl__empty">还没有歌 · 点下面的「添加一首」或「上传 mp3」，就能有好几首轮着放了</div>';
+    }
+    return pl.map((t, i) => `
+      <div class="pl__row">
+        <span class="pl__ico">${i === 0 ? '▶' : '♪'}</span>
+        <div class="pl__main">
+          <div class="pl__title">${esc(t.title || '未命名')}</div>
+          <div class="pl__sub">${esc(t.artist ? t.artist + ' · ' : '')}${esc(String(t.url || '').slice(0, 60))}</div>
+        </div>
+        <button type="button" class="pl__btn" data-mus="top" data-i="${i}" title="放到第一位">⇧</button>
+        <button type="button" class="pl__btn" data-mus="edit" data-i="${i}" title="改歌名 / 歌手">✏️</button>
+        <button type="button" class="pl__btn" data-mus="del" data-i="${i}" title="删掉这首">🗑️</button>
+      </div>`).join('');
+  }
+
+  /** 列表变了就只重画列表，别把整页重画（不然刚填的表单会丢） */
+  function paintPl(root) {
+    const box = root.querySelector('#pl-list');
+    if (box) box.innerHTML = playlistHtml(PL);
+  }
+
+  function musFields(t) {
+    return [
+      { name: 'title', label: '歌名', type: 'text', value: (t && t.title) || '', placeholder: '例如：小情歌' },
+      { name: 'artist', label: '歌手（可不填）', type: 'text', value: (t && t.artist) || '' },
+      { name: 'url', label: '音乐地址（mp3 直链）', type: 'text', value: (t && t.url) || '', placeholder: 'https://.../song.mp3', required: true, hint: '也可以先点「上传 mp3」把文件传上来' }
+    ];
+  }
+
   function render(ctx) {
     const s = ctx.s || {};
     const t = window.Theme.normalize(s.theme);
     const m = Object.assign({}, (CFG.defaults || {}).music, s.music || {});
+    const mode = ['loop', 'order', 'random', 'one'].indexOf(m.mode) >= 0 ? m.mode : 'loop';
+    const pl = playlistOf(s);
+    PL = pl.slice();
     const coverOpts = [{ value: '', label: '不用大图（纯色/渐变背景）' }].concat(
       (ctx.photos || []).map((p) => ({ value: p.id, label: (p.caption || '照片') + ' · ' + U.fmtDate(p.taken_at, { short: true }) }))
     );
@@ -176,20 +220,27 @@ window.Views.settings = (function () {
         <div class="card card--pad set-sec">
           <h3 class="set-sec__title">🎵 背景音乐</h3>
           <div class="set-grid">
-            <label class="field"><span class="field__label">音乐地址（mp3 直链）</span>
-              <input class="input" name="musicUrl" value="${esc(m.url || '')}" placeholder="https://.../song.mp3"></label>
-            <label class="field"><span class="field__label">歌名</span>
-              <input class="input" name="musicTitle" value="${esc(m.title || '')}"></label>
-            <label class="field"><span class="field__label">歌手</span>
-              <input class="input" name="musicArtist" value="${esc(m.artist || '')}"></label>
+            <label class="field"><span class="field__label">播放方式</span>
+              <select class="input" name="musicMode">
+                <option value="loop" ${mode === 'loop' ? 'selected' : ''}>🔁 列表循环（放完回到第一首）</option>
+                <option value="order" ${mode === 'order' ? 'selected' : ''}>➡️ 顺序播放（放完就停）</option>
+                <option value="random" ${mode === 'random' ? 'selected' : ''}>🔀 随机播放</option>
+                <option value="one" ${mode === 'one' ? 'selected' : ''}>🔂 单曲循环</option>
+              </select></label>
             <label class="field"><span class="field__label">音量：<b data-vol-val>${Math.round((m.volume || 0.6) * 100)}</b>%</span>
               <input type="range" min="0" max="1" step="0.05" name="musicVolume" value="${m.volume || 0.6}" style="accent-color:var(--accent)"></label>
           </div>
-          <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-top:6px">
-            <button type="button" class="btn btn--ghost btn--sm" data-upload="music">🎧 上传 mp3</button>
+
+          <div class="field__label" style="margin-top:12px">播放列表（可以有好多首，右下角小唱片点 ⏮ ⏭ 换歌）</div>
+          <div class="pl" id="pl-list">${playlistHtml(pl)}</div>
+
+          <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-top:10px">
+            <button type="button" class="btn btn--ghost btn--sm" data-mus="add">＋ 添加一首（填网址）</button>
+            <button type="button" class="btn btn--ghost btn--sm" data-mus="up-file">🎧 上传 mp3</button>
             <label class="check"><input type="checkbox" name="musicAutoplay" ${m.autoplay ? 'checked' : ''}> 打开网站自动播放</label>
             <span class="field__hint">自动播放常被手机浏览器拦截，建议让 TA 点一下右下角的小唱片</span>
           </div>
+          <input type="file" accept="audio/*" id="mus-file" hidden>
         </div>
 
         <div style="display:flex;gap:12px;flex-wrap:wrap;align-items:center;margin-top:18px">
@@ -241,6 +292,7 @@ window.Views.settings = (function () {
     const mems = (ctx.aiMemories || []).slice()
       .sort((a, b) => String(b.created_at || '').localeCompare(String(a.created_at || '')));
     const kinds = ['第一次', '称呼', '习惯', '纪念日', '家人朋友', '其他'];
+    const curBuddy = (ctx.settings && ctx.settings.buddyImage) || 'assets/img/buddy-him.jpg';
 
     return `
       <div class="card card--pad set-sec" style="margin-top:22px">
@@ -278,6 +330,23 @@ window.Views.settings = (function () {
 
           <label class="field"><span class="field__label">说话习惯：口头禅、怎么称呼她、不要说的话</span>
             <textarea class="input" name="aiStyle" rows="4" placeholder="口头禅：乖乖、好家伙&#10;怎么称呼她：宝贝、张张包&#10;不要说的话：别用「亲爱的用户」「作为 AI」这种腔调">${esc(c.style_notes || '')}</textarea></label>
+
+          <div class="field">
+            <span class="field__label">分身形象（聊天页顶上那个小人）</span>
+            <div class="buddy-picks">
+              <button type="button" class="buddy-pick ${curBuddy === 'assets/img/buddy-him.jpg' ? 'is-active' : ''}" data-buddy="assets/img/buddy-him.jpg" title="3D 童话">
+                <img src="assets/img/buddy-him.jpg" alt="3D 童话"><span class="buddy-pick__name">3D 童话</span></button>
+              <button type="button" class="buddy-pick ${curBuddy === 'assets/img/buddy-him-2d.jpg' ? 'is-active' : ''}" data-buddy="assets/img/buddy-him-2d.jpg" title="二次元">
+                <img src="assets/img/buddy-him-2d.jpg" alt="二次元"><span class="buddy-pick__name">二次元</span></button>
+              <button type="button" class="buddy-pick ${curBuddy === 'assets/img/buddy-him-soft.jpg' ? 'is-active' : ''}" data-buddy="assets/img/buddy-him-soft.jpg" title="小清新">
+                <img src="assets/img/buddy-him-soft.jpg" alt="小清新"><span class="buddy-pick__name">小清新</span></button>
+              <button type="button" class="buddy-pick ${curBuddy === 'svg' ? 'is-active' : ''}" data-buddy="svg" title="手绘小人">
+                <span class="buddy-pick__svg">🧑‍🎨</span><span class="buddy-pick__name">手绘小人</span></button>
+              <button type="button" class="buddy-pick" data-buddy-up title="用你自己的图片">
+                <span class="buddy-pick__svg">＋</span><span class="buddy-pick__name">自己的图</span></button>
+            </div>
+            <span class="field__hint">点一下就换（会立刻保存，不用再点下面的保存按钮）</span>
+          </div>
 
           <div style="display:flex;gap:16px;flex-wrap:wrap;margin:4px 0 12px">
             <label class="check"><input type="checkbox" name="aiEnabled" ${c.enabled !== false ? 'checked' : ''}> 开启 AI 分身</label>
@@ -394,13 +463,15 @@ window.Views.settings = (function () {
         wallCols: Number(v('wallCols'))
       },
       music: {
-        url: v('musicUrl'),
-        title: v('musicTitle'),
-        artist: v('musicArtist'),
+        url: (PL[0] && PL[0].url) || '',
+        title: (PL[0] && PL[0].title) || '',
+        artist: (PL[0] && PL[0].artist) || '',
         autoplay: !!(form.elements.musicAutoplay && form.elements.musicAutoplay.checked),
         volume: Number(v('musicVolume')),
+        mode: v('musicMode') || 'loop',
         cover: (themeNow.cover !== undefined ? themeNow.cover : ((CFG.defaults.music || {}).cover || ''))
-      }
+      },
+      playlist: PL.map((t) => ({ url: t.url, title: t.title || '', artist: t.artist || '', cover: t.cover || '' }))
     };
   }
 
@@ -482,8 +553,11 @@ window.Views.settings = (function () {
               form.elements.bgImage.value = url;
               form.elements.bgStyle.value = 'image';
             } else if (kind === 'music') {
-              form.elements.musicUrl.value = url;
-              if (!form.elements.musicTitle.value) form.elements.musicTitle.value = f.name.replace(/\.[^.]+$/, '');
+              PL.push({ url: url, title: f.name.replace(/\.[^.]+$/, ''), artist: '', cover: '' });
+              paintPl(root);
+              U.toast('加进播放列表了，记得点保存', 'success');
+              up.textContent = '🎧 上传 mp3'; up.disabled = false;
+              return;
             }
             preview(form);
             U.toast('上传成功，记得点保存', 'success');
@@ -607,6 +681,37 @@ window.Views.settings = (function () {
       });
 
       root.addEventListener('click', async (e) => {
+        const bp = e.target.closest('[data-buddy]');
+        if (bp) {
+          const v = bp.getAttribute('data-buddy');
+          try {
+            await window.DB.settings.patch({ buddyImage: v });
+            if (window.App && window.App.state && window.App.state.s) window.App.state.s.buddyImage = v;
+            root.querySelectorAll('[data-buddy]').forEach((b) => b.classList.toggle('is-active', b === bp));
+            U.toast('分身形象换好了 💗', 'success');
+          } catch (err) { U.toast(err.message, 'error'); }
+          return;
+        }
+
+        const bup = e.target.closest('[data-buddy-up]');
+        if (bup) {
+          const inp = document.createElement('input');
+          inp.type = 'file'; inp.accept = 'image/*';
+          inp.onchange = async () => {
+            const f = inp.files && inp.files[0];
+            if (!f) return;
+            try {
+              U.toast('形象上传中…');
+              const url = await window.DB.media.upload(f, 'avatar');
+              await window.DB.settings.patch({ buddyImage: url });
+              if (window.App && window.App.state && window.App.state.s) window.App.state.s.buddyImage = url;
+              U.toast('换好啦，去「AI 分身」页看看 💗', 'success');
+            } catch (err) { U.toast(err.message, 'error'); }
+          };
+          inp.click();
+          return;
+        }
+
         const testBtn = e.target.closest('[data-ai-test]');
         if (testBtn) {
           testBtn.disabled = true;
@@ -662,6 +767,67 @@ window.Views.settings = (function () {
         }
       });
     }
+
+    /* --------------------------------------------------- 播放列表 */
+    root.addEventListener('click', async (e) => {
+      const b = e.target.closest('[data-mus]');
+      if (!b) return;
+      const what = b.getAttribute('data-mus');
+      const i = Number(b.getAttribute('data-i') || 0);
+
+      if (what === 'add') {
+        const r = await U.formBox('添加一首歌', musFields(null), { okText: '加进列表' });
+        if (!r || !r.url) return;
+        PL.push({ url: String(r.url).trim(), title: String(r.title || '').trim(), artist: String(r.artist || '').trim(), cover: '' });
+        paintPl(root);
+        U.toast('加进去了，记得点「保存设置」', 'success');
+        return;
+      }
+
+      if (what === 'up-file') {
+        const inp = root.querySelector('#mus-file');
+        if (!inp) return;
+        inp.onchange = async () => {
+          const f = inp.files && inp.files[0];
+          if (!f) return;
+          try {
+            U.toast('上传中…');
+            const url = await window.DB.media.upload(f, 'music');
+            PL.push({ url: url, title: f.name.replace(/\.[^.]+$/, ''), artist: '', cover: '' });
+            paintPl(root);
+            U.toast('加进播放列表了，记得点「保存设置」', 'success');
+          } catch (err) { U.toast(err.message, 'error'); }
+          inp.value = '';
+        };
+        inp.click();
+        return;
+      }
+
+      if (what === 'edit') {
+        if (!PL[i]) return;
+        const r = await U.formBox('改这首歌', musFields(PL[i]), { okText: '保存' });
+        if (!r || !r.url) return;
+        PL[i] = { url: String(r.url).trim(), title: String(r.title || '').trim(), artist: String(r.artist || '').trim(), cover: PL[i].cover || '' };
+        paintPl(root);
+        return;
+      }
+
+      if (what === 'del') {
+        if (!PL[i]) return;
+        if (!(await U.confirmBox('把《' + (PL[i].title || '未命名') + '》从播放列表里删掉？', { title: '移出列表', okText: '删掉', danger: true }))) return;
+        PL.splice(i, 1);
+        paintPl(root);
+        U.toast('移出去了，记得点「保存设置」', 'success');
+        return;
+      }
+
+      if (what === 'top') {
+        if (!PL[i] || i === 0) return;
+        const one = PL.splice(i, 1)[0];
+        PL.unshift(one);
+        paintPl(root);
+      }
+    });
 
     preview(form);
   }

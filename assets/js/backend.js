@@ -18,9 +18,10 @@ window.DB = (function () {
     identity: 'love.identity',
     aiConfig: 'love.ai.config',
     aiMemories: 'love.ai.memories',
-    aiMessages: 'love.ai.messages'
+    aiMessages: 'love.ai.messages',
+    trips: 'love.trips'
   };
-  const TABLES = ['settings', 'photos', 'diary_entries', 'notes', 'wishes', 'events', 'pokes', 'ai_messages'];
+  const TABLES = ['settings', 'photos', 'diary_entries', 'notes', 'wishes', 'events', 'pokes', 'ai_messages', 'trips'];
 
   let sb = null;                 // supabase client
   let mode = 'local';
@@ -188,9 +189,9 @@ window.DB = (function () {
       return (data || []).map((p) => (p.src = publicUrl(bucket('photo'), p.path), p));
     },
 
-    /** 上传一张照片；file 为 File，meta = {caption, taken_at, tags, author} */
+    /** 上传一张照片；file 为 File，meta = {caption, taken_at, tags, author, city, province} */
     async add(file, meta, onStep) {
-      const m = Object.assign({ caption: '', taken_at: U.todayStr(), tags: [], author: '' }, meta || {});
+      const m = Object.assign({ caption: '', taken_at: U.todayStr(), tags: [], author: '', city: '', province: '' }, meta || {});
       const { blob, width, height } = await U.compressImage(file);
       if (onStep) onStep('compressing');
       const ext = /png$/i.test(blob.type) ? 'png' : (/webp$/i.test(blob.type) ? 'webp' : 'jpg');
@@ -202,6 +203,7 @@ window.DB = (function () {
         const row = {
           id: U.uid(), path, caption: m.caption, taken_at: m.taken_at,
           tags: m.tags || [], author: m.author, is_home: false, is_cover: false,
+          city: m.city || '', province: m.province || '',
           width, height, created_at: new Date().toISOString()
         };
         const arr = lsGet(LS.photos, []);
@@ -219,7 +221,8 @@ window.DB = (function () {
       if (upErr) throw new Error('上传失败：' + upErr.message);
       const row = {
         path, caption: m.caption, taken_at: m.taken_at || null,
-        tags: m.tags || [], author: m.author, width, height
+        tags: m.tags || [], author: m.author, width, height,
+        city: m.city || null, province: m.province || null
       };
       const { data, error } = await sb.from('photos').insert(row).select().single();
       if (error) throw new Error('保存记录失败：' + error.message);
@@ -330,6 +333,53 @@ window.DB = (function () {
   const wishes = makeCRUD('wishes', 'wishes', 'created_at');
   const events = makeCRUD('events', 'events', 'date');
   const notes = makeCRUD('notes', 'notes', 'created_at');
+
+  /* ----------------------------------------------------------- 旅行轨迹 🗺️ */
+  const trips = Object.assign(makeCRUD('trips', 'trips', 'first_date'), {
+    /** 按省份归类：[{province, cities:[], times, first, last}] */
+    group(rows) {
+      const map = {};
+      (rows || []).forEach((r) => {
+        const pv = r.province || '';
+        if (!pv) return;
+        if (!map[pv]) map[pv] = { province: pv, cities: [], times: 0, first: '', last: '' };
+        const g = map[pv];
+        g.times += Number(r.times) || 1;
+        if (r.city && g.cities.indexOf(r.city) < 0) g.cities.push(r.city);
+        const d = r.first_date || r.last_date || '';
+        if (d && (!g.first || d < g.first)) g.first = d;
+        const dl = r.last_date || d;                    // 最近一次：优先用专门的 last_date
+        if (dl && (!g.last || dl > g.last)) g.last = dl;
+      });
+      return Object.keys(map).map((k) => map[k]).sort((a, b) => String(b.first).localeCompare(String(a.first)));
+    },
+    /** 汇总：去过几个省 / 几个城市 / 一共几次 */
+    summary(rows) {
+      const pv = new Set();
+      const ct = new Set();
+      let times = 0;
+      (rows || []).forEach((r) => {
+        if (r.province) pv.add(r.province);
+        if (r.city) ct.add((r.province || '') + '|' + r.city);
+        times += Number(r.times) || 1;
+      });
+      return { provinces: pv.size, cities: ct.size, times: times };
+    },
+    /** 某个省/市下面挂着的照片 */
+    photosOf(list, province, city) {
+      return (list || []).filter((p) => {
+        if (city && p.city === city) return true;
+        if (!city && province && p.province === province) return true;
+        return false;
+      });
+    },
+    /** 已经打过卡的城市名（给上传照片时的候选） */
+    cityNames(rows) {
+      const set = new Set();
+      (rows || []).forEach((r) => { if (r.city) set.add(r.city); });
+      return Array.from(set);
+    }
+  });
 
   /* ------------------------------------------------------------ 戳一戳 💗 */
   const pokes = Object.assign(makeCRUD('pokes', 'pokes', 'created_at'), {
@@ -495,7 +545,7 @@ window.DB = (function () {
 
   /* --------------------------------------------------------------- 导出 */
   return {
-    init, isCloud, client, auth, identity, me, settings, photos, diary, wishes, events, notes, pokes, media, ai,
+    init, isCloud, client, auth, identity, me, settings, photos, diary, wishes, events, notes, pokes, trips, media, ai,
     on(fn) { changeHandlers.add(fn); },
     emit(table) { emit(table); },
     get cdnFailed() { return cdnFailed; },
