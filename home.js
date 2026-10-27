@@ -41,6 +41,23 @@ window.Views.home = (function () {
                .sort((a, b) => a.n - b.n);
   }
 
+  /* ---------------- 计时器左边的小人 ---------------- */
+  function counterBuddy(ctx) {
+    const ai = window.Views && window.Views.ai;
+    if (!ai || !ai.buddyPic) return '';
+    const pic = ai.buddyPic(ctx);
+    const inner = pic
+      ? `<img src="${esc(pic)}" alt="${esc((ctx.me && ctx.me.name) || '')}" class="hb__pic">`
+      : (ai.buddySvg ? ai.buddySvg() : '');
+    if (!inner) return '';
+    const st = ctx.settings || {};
+    const name = st.nicknameA || '我';
+    return `<div class="counter__buddy" id="home-buddy" title="${esc(name)} 一直在这儿陪着你">
+      <div class="hb">${inner}</div>
+      <div class="hb__tail"></div>
+    </div>`;
+  }
+
   /* ---------------- 渲染 ---------------- */
   function render(ctx) {
     const s = ctx.settings;
@@ -93,13 +110,18 @@ window.Views.home = (function () {
         ${s.tagline ? `<p class="hero__tagline">${esc(s.tagline)}</p>` : ''}
 
         <div class="counter">
-          <div class="counter__row">
-            <div class="counter__cell"><div class="counter__num mono" data-c="d">${elapsedDays}</div><div class="counter__unit">天</div></div>
-            <div class="counter__cell"><div class="counter__num mono" data-c="h">00</div><div class="counter__unit">时</div></div>
-            <div class="counter__cell"><div class="counter__num mono" data-c="m">00</div><div class="counter__unit">分</div></div>
-            <div class="counter__cell"><div class="counter__num mono" data-c="s">00</div><div class="counter__unit">秒</div></div>
+          <div class="counter__flex">
+            ${counterBuddy(ctx)}
+            <div class="counter__main">
+              <div class="counter__row">
+                <div class="counter__cell"><div class="counter__num mono" data-c="d">${elapsedDays}</div><div class="counter__unit">天</div></div>
+                <div class="counter__cell"><div class="counter__num mono" data-c="h">00</div><div class="counter__unit">时</div></div>
+                <div class="counter__cell"><div class="counter__num mono" data-c="m">00</div><div class="counter__unit">分</div></div>
+                <div class="counter__cell"><div class="counter__num mono" data-c="s">00</div><div class="counter__unit">秒</div></div>
+              </div>
+              <div class="counter__sub">从 <b>${esc(U.fmtDate(s.anniversary))}</b> 到今天，我们已经在一起这么久了</div>
+            </div>
           </div>
-          <div class="counter__sub">从 <b>${esc(U.fmtDate(s.anniversary))}</b> 到今天，我们已经在一起这么久了</div>
         </div>
 
         ${pokeBox(ctx, s)}
@@ -363,6 +385,15 @@ window.Views.home = (function () {
     }
     tick();
     timer = setInterval(tick, 1000);
+
+    // 计时器左边的小人：图挂了就整块藏起来，别留一个破图标
+    const hb = root.querySelector('#home-buddy');
+    if (hb) {
+      const pic = hb.querySelector('.hb__pic');
+      if (pic) pic.addEventListener('error', () => { hb.style.display = 'none'; });
+      hb.addEventListener('click', () => { location.hash = '#/ai'; });
+      hb.style.cursor = 'pointer';
+    }
 
     root.addEventListener('click', (e) => {
       const t = e.target.closest('[data-act],[data-tag]');

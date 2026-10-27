@@ -41,6 +41,16 @@ window.Views.ai = (function () {
     return 'calm';
   }
 
+  /* 分身形象：默认用百炼「人像风格重绘」生成的卡通形象（assets/img/…）
+     settings.buddyImage 可以是：图片地址（本站图片或上传后的地址）/ 'svg'（手绘小人）/ 空（用默认） */
+  const BUDDY_DEFAULT = 'assets/img/buddy-him.jpg';
+
+  function buddyPic(ctx) {
+    const v = s(ctx).buddyImage;
+    if (v === 'svg') return '';
+    return v || BUDDY_DEFAULT;
+  }
+
   function buddySvg() {
     return `
       <svg class="buddy__svg" viewBox="0 0 200 214" role="img" aria-label="AI 分身">
@@ -95,12 +105,15 @@ window.Views.ai = (function () {
       </svg>`;
   }
 
-  function buddyHtml(name) {
+  function buddyHtml(name, pic) {
+    const p = pic === undefined ? BUDDY_DEFAULT : pic;
     return `
       <div class="card buddy-card">
-        <div class="buddy is-idle mood-calm" id="ai-buddy">
+        <div class="buddy is-idle mood-calm ${p ? 'has-pic' : 'no-pic'}" id="ai-buddy">
           <div class="buddy__stage">
+            ${p ? `<img class="buddy__pic" src="${esc(p)}" alt="${esc(name)} 的形象">` : ''}
             ${buddySvg()}
+            <span class="buddy__hearts" aria-hidden="true"><i>💗</i><i>💗</i></span>
             <div class="buddy__think" aria-hidden="true"><i></i><i></i><i></i></div>
           </div>
           <div class="buddy__side">
@@ -126,6 +139,12 @@ window.Views.ai = (function () {
       avatar: (owner === 'A' ? st.avatarA : st.avatarB) || '',
       herName: (owner === 'A' ? st.nicknameB : st.nicknameA) || 'TA'
     };
+  }
+
+  /** 当前登录的人是不是「分身代表的那个人」本身（他只能看，不能聊） */
+  function isOwner(ctx) {
+    const oi = ownerInfo(ctx);
+    return !!(ctx.canEdit && ctx.me && ctx.me.key && ctx.me.key === oi.owner);
   }
 
   function pad2(n) { return (n < 10 ? '0' : '') + n; }
@@ -165,7 +184,8 @@ window.Views.ai = (function () {
     // 本地模式没登录时 me.name 是 'local'，显示成「我」更自然
     const myName = (ctx.me && ctx.me.name && ctx.me.name !== 'local') ? ctx.me.name : '我';
     const who = mine ? myName : oi.name;
-    const avatar = mine ? ((ctx.me && ctx.me.avatar) || '') : oi.avatar;
+    // 分身说的话在左边，头像就用他的卡通形象（没配图时退回昵称头像）
+    const avatar = mine ? ((ctx.me && ctx.me.avatar) || '') : (buddyPic(ctx) || oi.avatar);
     const isGreet = /^greeting/.test(String(m.kind || ''));
     return `
       <div class="chat__row ${mine ? 'is-me' : 'is-ai'}">
@@ -232,20 +252,52 @@ window.Views.ai = (function () {
             <li>在 <a href="#/settings">设置 → AI 分身</a> 里选「用哪家的模型」、写上人设，然后回到这一页</li>
           </ol>
         </div></div>
-        ${buddyHtml(ownerInfo(ctx).name)}
-        <p class="section__desc" style="text-align:center">上面这个小人是照着他的样子画的，配置完他就会动起来跟你说话 💗</p>
+        ${buddyHtml(ownerInfo(ctx).name, buddyPic(ctx))}
+        <p class="section__desc" style="text-align:center">上面这个形象是照着他的样子生成的，配置完他就会动起来跟你说话 💗</p>
       </section>`;
     }
 
     const oi = ownerInfo(ctx);
     const cfg = ctx.aiConfig || {};
-    const meIsOwner = ctx.me && ctx.me.key === oi.owner;
+
+    /* ---- 他本人打开：只看她和分身的聊天记录（只读） ---- */
+    if (isOwner(ctx)) {
+      const todayKey = dayKey(new Date());
+      const today = S.msgs.filter((m) => dayKey(m.created_at) === todayKey).length;
+      return `
+      <section class="section">
+        <div class="section__head">
+          <h2 class="section__title">👀 ${esc(oi.herName)} 和你的 AI 分身聊了什么</h2>
+          <p class="section__desc">她能聊，你只能看 · 这里是完整对话（共 ${S.msgs.length} 条${today ? '，今天 ' + today + ' 条' : ''}）</p>
+          <div class="section__actions">
+            <button class="btn btn--ghost btn--sm" data-ai="reload">🔄 刷新</button>
+            <button class="btn btn--ghost btn--sm" data-ai="settings">⚙️ 改人设和记忆</button>
+          </div>
+        </div>
+
+        <div class="banner banner--info"><span>🤫</span><div>
+          这一页只有你能看到：<b>${esc(oi.herName)}</b> 在她的账号里跟你的分身说了什么，这里都会出现。
+          想让她收到更像你的回答，就去 <a href="#/settings">设置 → AI 分身</a> 补人设和记忆。
+        </div></div>
+        ${cfg.enabled === false ? '<div class="banner banner--warn"><span>⏸️</span><div>分身现在被关掉了（设置 → AI 分身 → 总开关），她那边也聊不了。</div></div>' : ''}
+        <div id="ai-err"></div>
+
+        ${buddyHtml(oi.name, buddyPic(ctx))}
+
+        <div class="card chat">
+          <div class="chat__list" id="chat-list">${listHtml(ctx)}</div>
+          <div class="chat__foot">
+            <div class="chat__note">🔒 只读模式：消息只能由她在自己的账号里发出，你这边改不了也删不掉。</div>
+          </div>
+        </div>
+      </section>`;
+    }
 
     return `
     <section class="section">
       <div class="section__head">
         <h2 class="section__title">💬 和 ${esc(oi.name)} 的 AI 分身聊聊</h2>
-        <p class="section__desc">${esc(oi.herName)} 打开这一页，看到的就是这个分身 · 不联网聊不了天，但随时都在</p>
+        <p class="section__desc">${esc(oi.name)} 不在的时候，也可以跟他的分身说说话</p>
         <div class="section__actions">
           <button class="btn btn--ghost btn--sm" data-ai="settings">⚙️ 改人设和记忆</button>
           ${S.msgs.length ? '<button class="btn btn--ghost btn--sm" data-ai="clear">🧹 清空对话</button>' : ''}
@@ -253,11 +305,10 @@ window.Views.ai = (function () {
       </div>
 
       ${cfg.enabled === false ? '<div class="banner banner--warn"><span>⏸️</span><div>分身现在被关掉了（设置 → AI 分身 → 总开关）。</div></div>' : ''}
-      ${meIsOwner ? `<div class="banner banner--info"><span>🙋</span><div>这一页现在是你自己（${esc(oi.name)}）在跟自己的分身说话。她那边看到的就是这个页面。</div></div>` : ''}
       <div id="ai-warn"></div>
       <div id="ai-err"></div>
 
-      ${buddyHtml(oi.name)}
+      ${buddyHtml(oi.name, buddyPic(ctx))}
 
       <div class="card chat">
         <div class="chat__list" id="chat-list">${listHtml(ctx)}${typingHtml()}</div>
@@ -268,7 +319,7 @@ window.Views.ai = (function () {
         </form>
         <div class="chat__foot">
           <div class="chat__chips">${CHIPS.map((c) => `<button class="chat__chip" data-ai-chip="${esc(c)}">${esc(c)}</button>`).join('')}</div>
-          <div class="chat__note" id="chat-note">💡 这是 AI 分身，说得不像的地方，去「设置 → AI 分身」改人设和记忆就好。</div>
+          <div class="chat__note" id="chat-note">💡 这是 AI 分身，说得不像的地方，去「设置 → AI 分身」改人设和记忆就好；他本人在自己的账号里能看到这里的全部对话。</div>
         </div>
       </div>
     </section>`;
@@ -425,6 +476,11 @@ window.Views.ai = (function () {
     root.addEventListener('error', (e) => {
       const img = e.target;
       if (!img || img.tagName !== 'IMG' || !img.parentNode) return;
+      if (img.classList && img.classList.contains('buddy__pic')) {
+        const b = img.closest('#ai-buddy');          // 卡通形象没加载出来 → 退回手绘小人
+        if (b) b.classList.add('pic-fail');
+        return;
+      }
       const box = img.parentNode;
       if (!box.classList || !box.classList.contains('chat__ava')) return;
       box.classList.add('chat__ava--txt');
@@ -455,6 +511,13 @@ window.Views.ai = (function () {
       if (act) {
         const what = act.getAttribute('data-ai');
         if (what === 'settings') { location.hash = '#/settings'; return; }
+        if (what === 'reload') {
+          S.loaded = false; S.msgs = [];
+          paint(root, ctx);
+          await load(root, ctx);
+          U.toast('已是最新 ✓', 'success');
+          return;
+        }
         if (what === 'clear') {
           if (await U.confirmBox('把你们的聊天记录全部删掉？（两个人的都会没）', { title: '清空对话', okText: '清空', danger: true })) {
             try {
@@ -471,13 +534,13 @@ window.Views.ai = (function () {
       }
     });
 
-    // 先拿记录，再决定要不要自动问候
-    load(root, ctx).then(() => { maybeGreet(root, ctx); });
+    // 先拿记录，再决定要不要自动问候（他本人的只读页面不触发问候）
+    load(root, ctx).then(() => { if (!isOwner(ctx)) maybeGreet(root, ctx); });
 
     return () => {
       if (talkTimer) { clearTimeout(talkTimer); talkTimer = null; }
     };
   }
 
-  return { render, mount, title: 'AI 分身', buddyHtml, buddySvg, moodOf };
+  return { render, mount, title: 'AI 分身', buddyHtml, buddySvg, moodOf, buddyPic };
 })();
